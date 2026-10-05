@@ -1,0 +1,16 @@
+# Strict analyzer configuration for AlarmX.
+# Enables exactly the lint rules required by the project specification.
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    avoid_print: true
+    always_declare_return_types: true
+    prefer_final_locals: true
+    unnecessary_this: true
