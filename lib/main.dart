@@ -5,7 +5,7 @@ import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
 void main() {
