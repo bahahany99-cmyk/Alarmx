@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -104,9 +105,18 @@ class MainActivity : FlutterActivity() {
      * built here must be equivalent to the one used in [scheduleExact] (same
      * request code + same intent component/action/extras); we reuse the
      * single helper to guarantee that.
+     *
+     * If the alarm already fired and [AlarmForegroundService] is ringing, the
+     * service is stopped as well so "cancel" reliably silences the alarm. This
+     * is a no-op when the service is not running.
      */
     private fun cancelExact(alarmManager: AlarmManager, alarmId: Int) {
         alarmManager.cancel(buildAlarmPendingIntent(alarmId))
+        try {
+            stopService(Intent(this, AlarmForegroundService::class.java))
+        } catch (t: Throwable) {
+            Log.w("AlarmX", "Could not stop ringing service during cancel.", t)
+        }
     }
 
     /**

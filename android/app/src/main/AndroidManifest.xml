@@ -9,11 +9,24 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!--
-      Required to post the test notification on Android 13+ (API 33+). This
-      is a runtime permission; the OS will silently drop notifications until
-      the user grants it, but the broadcast pipeline still works.
+      Required to post notifications on Android 13+ (API 33+), including the
+      foreground service notification. This is a runtime permission; without
+      it the ringing service cannot run in the foreground and stops itself.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      Phase 1.2 foreground ringing service. FOREGROUND_SERVICE is required to
+      call startForeground(); FOREGROUND_SERVICE_MEDIA_PLAYBACK matches the
+      service's android:foregroundServiceType="mediaPlayback" declaration
+      (required on Android 14+); VIBRATE drives the alarm vibration pattern;
+      WAKE_LOCK keeps the CPU awake via a partial wake lock while ringing.
+      All four are install-time (normal) permissions, no runtime prompt.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="alarmx"
@@ -54,6 +67,17 @@
                 <action android:name="com.alarmx.app.alarmx.ALARM_FIRE" />
             </intent-filter>
         </receiver>
+
+        <!--
+          Phase 1.2 ringing service started by AlarmReceiver. Not exported: only
+          our own process starts/stops it. The mediaPlayback foreground type
+          covers continuous alarm audio; the matching FOREGROUND_SERVICE and
+          FOREGROUND_SERVICE_MEDIA_PLAYBACK permissions are declared above.
+        -->
+        <service
+            android:name=".AlarmForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
