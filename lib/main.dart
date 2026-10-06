@@ -1,4 +1,5 @@
 // TEMPORARY: manual native pipeline test screen. Will be replaced by the real home screen later.
+import 'package:alarmx/core/alarms/native_alarm_events.dart';
 import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/models/models.dart';
@@ -51,6 +52,23 @@ class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
     repository: _tempRepo,
     scheduler: const NativeAlarmSchedulerImpl(),
   );
+
+  // TEMP: listens for native post-fire stops (placeholder for real app
+  // wiring, which will attach this in the app shell instead).
+  final NativeAlarmEvents _tempEvents = NativeAlarmEvents();
+
+  @override
+  void initState() {
+    super.initState();
+    _tempEvents.onAlarmStopped = _handlePersistedAlarmStopped;
+    _tempEvents.attach();
+  }
+
+  @override
+  void dispose() {
+    _tempEvents.detach();
+    super.dispose();
+  }
 
   Future<void> _scheduleTestAlarm() async {
     try {
@@ -157,6 +175,44 @@ class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
       }
       setState(() {
         _status = 'Persisted test failed: $e';
+      });
+    }
+  }
+
+  // TEMP (Phase 2.4): routes a native post-fire stop to the coordinator so
+  // recurring alarms chain while the app is open, and reports the outcome.
+  Future<void> _handlePersistedAlarmStopped(
+    int alarmId,
+    DateTime firedTriggerAt,
+  ) async {
+    try {
+      final AlarmScheduleResult result =
+          await _tempCoordinator.rescheduleAfterFire(
+        alarmId: alarmId,
+        firedTriggerAt: firedTriggerAt,
+      );
+      if (!mounted) {
+        return;
+      }
+      final String outcome = switch (result) {
+        AlarmScheduled(:final triggerAt) =>
+          'Post-fire: rescheduled alarm $alarmId for $triggerAt',
+        AlarmNotSchedulable(:final reason) =>
+          'Post-fire: no further schedule ($reason)',
+        AlarmDisabled() =>
+          'Post-fire: alarm $alarmId disabled, not rescheduled',
+        AlarmPermissionMissing() => 'Post-fire: exact-alarm permission missing',
+        AlarmScheduleFailed(:final error) => 'Post-fire failed: $error',
+      };
+      setState(() {
+        _status = outcome;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Post-fire failed: $e';
       });
     }
   }

@@ -20,7 +20,9 @@ import androidx.core.content.ContextCompat
  *   the frozen fire config. The token is verified against [AlarmScheduleLedger]
  *   and the broadcast is dropped (no ring, no crash, one warning log) when it
  *   does not match the current schedule — e.g. a stale delivery racing a
- *   cancel/reschedule. The config is forwarded to the service untouched.
+ *   cancel/reschedule. The verified token and config are forwarded to the
+ *   service untouched, so the stop handoff can identify which schedule
+ *   just rang.
  * - Legacy test alarms carry the id only and bypass verification entirely,
  *   keeping the exact Phase 1.2 behavior.
  *
@@ -65,8 +67,8 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val isPersisted = intent.hasExtra(EXTRA_TRIGGER_AT_MILLIS)
+        val triggerAtMillis = intent.getLongExtra(EXTRA_TRIGGER_AT_MILLIS, -1L)
         if (isPersisted) {
-            val triggerAtMillis = intent.getLongExtra(EXTRA_TRIGGER_AT_MILLIS, -1L)
             if (!AlarmScheduleLedger.isCurrentSchedule(context, alarmId, triggerAtMillis)) {
                 Log.w(
                     TAG,
@@ -84,6 +86,7 @@ class AlarmReceiver : BroadcastReceiver() {
             action = AlarmForegroundService.ACTION_START
             putExtra(AlarmForegroundService.EXTRA_ALARM_ID, alarmId)
             if (isPersisted) {
+                putExtra(AlarmForegroundService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
                 intent.getStringExtra(EXTRA_LABEL)?.let { label ->
                     putExtra(AlarmForegroundService.EXTRA_LABEL, label)
                 }

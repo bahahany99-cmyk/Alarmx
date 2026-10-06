@@ -15,8 +15,9 @@
 //
 // Boundaries (deliberate, Phase 2.2 scope):
 //   - Only the NEXT occurrence is ever scheduled. No Dart timers keep the
-//     alarm alive; recurring re-scheduling after firing, and boot-time
-//     re-scheduling, belong to a later native phase.
+//     alarm alive; recurring re-scheduling after firing happens in
+//     [rescheduleAfterFire], driven by the native stop handoff, while
+//     boot-time re-scheduling belongs to a later native phase.
 //   - No scheduling logic lives in DAOs, entities, widgets, the repository
 //     SQL, or MainActivity: repositories persist, the native scheduler talks
 //     to Android, this coordinator orchestrates.
@@ -24,7 +25,8 @@
 //     timestamp policy belongs to a future repository-layer pass.
 //
 // Failure philosophy: scheduling calls never pretend success. The schedule
-// family (`scheduleAlarm`, `enableAlarm`, `rescheduleAlarm`) never throws
+// family (`scheduleAlarm`, `enableAlarm`, `rescheduleAlarm`,
+// `rescheduleAfterFire`) never throws
 // for domain/scheduler failures and reports everything via
 // [AlarmScheduleResult]. `cancelAlarm`/`disableAlarm` are idempotent
 // fire-and-forget state changes (unknown ids are a successful no-op) and
@@ -157,11 +159,125 @@ class AlarmSchedulingCoordinator {
   /// Recomputes and re-schedules the alarm (cancel -> calculate -> schedule).
   ///
   /// Explicit entry point for "something changed, recompute" flows (alarm
-  /// edits in a later phase, post-fire chaining). Identical to
-  /// [scheduleAlarm], which already cancels any previous native schedule
-  /// for the id before scheduling the newly calculated trigger.
+  /// edits in a later phase). Identical to [scheduleAlarm], which already
+  /// cancels any previous native schedule for the id before scheduling the
+  /// newly calculated trigger. Post-fire chaining uses
+  /// [rescheduleAfterFire] instead: same engine, plus the fired-token guard
+  /// that rejects stale and duplicate deliveries.
   Future<AlarmScheduleResult> rescheduleAlarm(int id, {DateTime? now}) {
     return scheduleAlarm(id, now: now);
+  }
+
+  /// Handles a just-fired alarm: completes one-time alarms, chains
+  /// recurring ones to their next occurrence.
+  ///
+  /// Flow: load -> skip when disabled (cancelling strays) -> reject when
+  /// [firedTriggerAt] no longer matches the stored schedule (stale,
+  /// duplicate, cancelled, or already-handled fire; the database is left
+  /// untouched) -> complete one-time alarms (cancel stray, clear trigger) ->
+  /// otherwise require exact-alarm permission -> cancel previous native
+  /// schedule -> schedule the next occurrence strictly after
+  /// [firedTriggerAt] -> persist it to `nextTriggerAt`. Fresh row state is
+  /// loaded, so edits made between scheduling and stopping take effect on
+  /// the next ring.
+  ///
+  /// Idempotency comes from the stored trigger: the first handling either
+  /// persists a strictly-later trigger or clears it, so any repeat delivery
+  /// of the same [firedTriggerAt] mismatches and is rejected without
+  /// touching the database. Never throws for domain or scheduler failures;
+  /// see [AlarmScheduleResult].
+  Future<AlarmScheduleResult> rescheduleAfterFire({
+    required int alarmId,
+    required DateTime firedTriggerAt,
+  }) async {
+    final Alarm? alarm = await _repository.getAlarmById(alarmId);
+    if (alarm == null) {
+      return AlarmScheduleFailed(StateError('Alarm $alarmId not found.'));
+    }
+    if (!alarm.enabled) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmDisabled();
+    }
+    // Tokens are millisecond-granular (native ledger keys); comparing at
+    // that granularity keeps Dart and native in agreement.
+    if (alarm.nextTriggerAt?.millisecondsSinceEpoch !=
+        firedTriggerAt.millisecondsSinceEpoch) {
+      return const AlarmNotSchedulable(
+        'Fired trigger is not the current schedule.',
+      );
+    }
+    final AlarmSchedule schedule = _toSchedule(alarm);
+    if (schedule.repeatType == RepeatType.once) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmNotSchedulable('One-time alarm already fired.');
+    }
+    final DateTime? next = _calculator.nextOccurrence(
+      schedule: schedule,
+      now: firedTriggerAt,
+    );
+    if (next == null || !next.isAfter(firedTriggerAt)) {
+      // Defensive: recurring schedules always yield a strictly-later next.
+      // Never re-fire the trigger that just fired.
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmNotSchedulable('No further occurrence.');
+    }
+    final bool allowed;
+    try {
+      allowed = await _scheduler.canScheduleExactAlarms();
+    } catch (e) {
+      return AlarmScheduleFailed(e);
+    }
+    if (!allowed) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmPermissionMissing();
+    }
+    try {
+      await _scheduler.cancelAlarm(alarmId: alarmId);
+    } catch (e) {
+      return AlarmScheduleFailed(e);
+    }
+    try {
+      await _scheduler.scheduleExactAlarm(
+        alarmId: alarmId,
+        triggerAt: next,
+        fireConfig: AlarmFireConfig(
+          label: alarm.label,
+          vibrationEnabled: alarm.vibrationEnabled,
+        ),
+      );
+    } catch (e) {
+      await _clearBestEffort(alarmId);
+      return AlarmScheduleFailed(e);
+    }
+    try {
+      final bool persisted = await _persistNextTrigger(alarmId, next);
+      if (!persisted) {
+        throw StateError('Alarm $alarmId no longer exists.');
+      }
+    } catch (e) {
+      return _rollbackAfterPersistFailure(alarmId, next, e);
+    }
+    return AlarmScheduled(next);
   }
 
   /// Cancels the OS schedule for [id] and clears its stored trigger.

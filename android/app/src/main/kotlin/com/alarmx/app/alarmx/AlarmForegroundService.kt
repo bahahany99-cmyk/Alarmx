@@ -34,6 +34,9 @@ import androidx.core.app.NotificationCompat
  * Fire config: a start may carry [EXTRA_LABEL] (shown in the notification,
  * default text otherwise) and [EXTRA_VIBRATION_ENABLED] (default true).
  * Starts without them — every legacy test alarm — behave exactly as before.
+ * A persisted start additionally carries [EXTRA_TRIGGER_AT_MILLIS], the
+ * schedule token the stop handoff reports back so Dart can complete or
+ * chain that exact schedule.
  */
 class AlarmForegroundService : Service() {
 
@@ -54,6 +57,13 @@ class AlarmForegroundService : Service() {
 
         /** Start extra carrying the vibration flag (default true). */
         const val EXTRA_VIBRATION_ENABLED = "vibration_enabled"
+
+        /**
+         * Start extra carrying the fired schedule token (millis). Present on
+         * persisted rings only; identifies which schedule just rang for the
+         * post-fire stop handoff.
+         */
+        const val EXTRA_TRIGGER_AT_MILLIS = "trigger_at_millis"
 
         private const val RINGING_CHANNEL_ID = "alarmx_ringing_channel"
         private const val RINGING_CHANNEL_NAME = "AlarmX Ringing"
@@ -78,6 +88,8 @@ class AlarmForegroundService : Service() {
 
     @Volatile
     private var isRinging = false
+    private var ringAlarmId: Int = -1
+    private var ringTriggerAtMillis: Long? = null
     private var ringLabel: String? = null
     private var vibrationEnabled = true
     private var ringtone: Ringtone? = null
@@ -107,6 +119,12 @@ class AlarmForegroundService : Service() {
                 }
                 ringLabel = intent?.getStringExtra(EXTRA_LABEL)
                 vibrationEnabled = intent?.getBooleanExtra(EXTRA_VIBRATION_ENABLED, true) ?: true
+                ringAlarmId = alarmId
+                ringTriggerAtMillis = if (intent?.hasExtra(EXTRA_TRIGGER_AT_MILLIS) == true) {
+                    intent.getLongExtra(EXTRA_TRIGGER_AT_MILLIS, -1L).takeIf { it >= 0 }
+                } else {
+                    null
+                }
                 startRinging(alarmId)
                 return START_NOT_STICKY
             }
@@ -278,10 +296,17 @@ class AlarmForegroundService : Service() {
      * Stops the ringtone, cancels vibration, releases the wake lock and leaves
      * the foreground state (removing the ongoing notification). Idempotent:
      * safe to call multiple times from the Stop action, [stopService]/cancel
-     * paths and [onDestroy].
+     * paths and [onDestroy]. When the call ends an actual ring of a
+     * persisted alarm it also fires the one-shot post-fire handoff
+     * ([MainActivity.notifyAlarmStopped]); duplicate calls report nothing.
      */
     private fun stopRinging() {
+        val wasRinging = isRinging
+        val stoppedAlarmId = ringAlarmId
+        val stoppedTriggerAtMillis = ringTriggerAtMillis
         isRinging = false
+        ringAlarmId = -1
+        ringTriggerAtMillis = null
         try {
             ringtone?.takeIf { it.isPlaying }?.stop()
         } catch (e: Exception) {
@@ -305,6 +330,12 @@ class AlarmForegroundService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (e: Exception) {
             Log.w(TAG, "Error leaving foreground state.", e)
+        }
+        // Post-fire handoff, exactly once per completed ring: the identity
+        // was cleared above, so duplicate stop calls find wasRinging false.
+        // Legacy test rings carry no schedule token and stay silent.
+        if (wasRinging && stoppedTriggerAtMillis != null) {
+            MainActivity.notifyAlarmStopped(stoppedAlarmId, stoppedTriggerAtMillis)
         }
     }
 }

@@ -28,11 +28,51 @@ import io.flutter.plugin.common.MethodChannel
  * is a legacy test alarm and keeps the exact Phase 1.2 behavior (id extra
  * only, no ledger interaction). Both share the requestCode slot namespace:
  * scheduling either kind for an id replaces whatever was pending for it.
+ *
+ * Reverse direction (native -> Dart, best-effort): when a persisted alarm
+ * stops ringing, [AlarmForegroundService] calls [notifyAlarmStopped], which
+ * delivers `onAlarmStopped { "alarmId": Int, "triggerAtMillis": Long }` on
+ * this same channel so Dart can chain the next occurrence. Delivery needs a
+ * live engine (the channel retained from [configureFlutterEngine]); when the
+ * process has none, the stop is simply not reported and ringing is
+ * unaffected. The fired trigger travels as a millis token so Dart can reject
+ * stale/duplicate deliveries without any native database access.
  */
 class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL_NAME = "com.alarmx.app.alarmx/alarm_scheduler"
+
+        /**
+         * Channel to the running engine, retained so the ringing service can
+         * report stops back to Dart. Null before the first engine attaches;
+         * calls into a dead engine throw and are caught by the caller.
+         */
+        private var alarmChannel: MethodChannel? = null
+
+        /**
+         * Best-effort post-fire handoff: tells Dart that the persisted alarm
+         * [alarmId] finished ringing for [triggerAtMillis], so the
+         * coordinator can complete or chain it. Fire-and-forget: a missing
+         * or dead engine only skips the report (ringing already stopped),
+         * never crashes. Stale/duplicate deliveries are rejected Dart-side
+         * using the trigger token.
+         */
+        fun notifyAlarmStopped(alarmId: Int, triggerAtMillis: Long) {
+            val channel = alarmChannel
+            if (channel == null) {
+                Log.d("AlarmX", "No engine channel; skipping post-fire notify for id: $alarmId.")
+                return
+            }
+            try {
+                channel.invokeMethod(
+                    "onAlarmStopped",
+                    mapOf("alarmId" to alarmId, "triggerAtMillis" to triggerAtMillis),
+                )
+            } catch (t: Throwable) {
+                Log.w("AlarmX", "Post-fire notify failed for id: $alarmId.", t)
+            }
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -41,8 +81,9 @@ class MainActivity : FlutterActivity() {
         val alarmManager =
             getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
-            .setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
+        alarmChannel = channel
+        channel.setMethodCallHandler { call, result ->
                 try {
                     when (call.method) {
                         "scheduleExactAlarm" -> {

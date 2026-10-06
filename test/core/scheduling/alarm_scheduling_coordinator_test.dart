@@ -375,4 +375,226 @@ void main() {
       expect(config.vibrationEnabled, isTrue);
     });
   });
+
+  group('post-fire rescheduling', () {
+    test('once alarm completes without scheduling again', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      expect(result, isA<AlarmNotSchedulable>());
+      expect(scheduler.scheduledIds, <int>[id]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('daily alarm chains to tomorrow', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+      expect(fired, DateTime(2026, 10, 6, 7, 30));
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      final AlarmScheduled scheduled = result as AlarmScheduled;
+      expect(scheduled.triggerAt, DateTime(2026, 10, 7, 7, 30));
+      expect(scheduler.scheduledTriggers.last, scheduled.triggerAt);
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduled.triggerAt,
+      );
+    });
+
+    test('custom alarm chains to the next selected weekday', () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(
+          <Weekday>{Weekday.monday, Weekday.wednesday, Weekday.friday},
+        ),
+        repeatType: RepeatType.custom,
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+      // Monday 07:30 already passed at 10:00 -> Wednesday.
+      expect(
+        scheduler.scheduledTriggers.single,
+        DateTime(2026, 10, 7, 7, 30),
+      );
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: DateTime(2026, 10, 7, 7, 30),
+      );
+
+      final AlarmScheduled scheduled = result as AlarmScheduled;
+      expect(scheduled.triggerAt, DateTime(2026, 10, 9, 7, 30));
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduled.triggerAt,
+      );
+    });
+
+    test('custom Friday fire wraps to Monday', () async {
+      final DateTime thursday = DateTime(2026, 10, 8, 10, 0);
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(
+          <Weekday>{Weekday.monday, Weekday.friday},
+        ),
+        repeatType: RepeatType.custom,
+      );
+      await coordinator.scheduleAlarm(id, now: thursday);
+      expect(
+        scheduler.scheduledTriggers.single,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: DateTime(2026, 10, 9, 7, 30),
+      );
+
+      final AlarmScheduled scheduled = result as AlarmScheduled;
+      expect(scheduled.triggerAt, DateTime(2026, 10, 12, 7, 30));
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduled.triggerAt,
+      );
+    });
+
+    test('custom alarm with today passed chains a week out', () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(<Weekday>{Weekday.monday}),
+        repeatType: RepeatType.custom,
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+      // Monday 07:30 passed -> next Monday.
+      expect(
+        scheduler.scheduledTriggers.single,
+        DateTime(2026, 10, 12, 7, 30),
+      );
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: DateTime(2026, 10, 12, 7, 30),
+      );
+
+      final AlarmScheduled scheduled = result as AlarmScheduled;
+      expect(scheduled.triggerAt, DateTime(2026, 10, 19, 7, 30));
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduled.triggerAt,
+      );
+    });
+
+    test('stale fired trigger is rejected without touching state', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime first = scheduler.scheduledTriggers.single;
+      // Alarm re-scheduled (e.g. edited) before the old fire is handled.
+      await coordinator.scheduleAlarm(id, now: first);
+      final DateTime second = scheduler.scheduledTriggers.last;
+      expect(second.isAfter(first), isTrue);
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: first,
+      );
+
+      expect(result, isA<AlarmNotSchedulable>());
+      expect(scheduler.scheduledIds.length, 2);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, second);
+    });
+
+    test('duplicate post-fire handling schedules only once', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+
+      final AlarmScheduleResult firstResult =
+          await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+      final AlarmScheduleResult secondResult =
+          await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      expect(firstResult, isA<AlarmScheduled>());
+      expect(secondResult, isA<AlarmNotSchedulable>());
+      expect(scheduler.scheduledTriggers.length, 2);
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduler.scheduledTriggers.last,
+      );
+    });
+
+    test('disabled alarm does not reschedule after fire', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+      await coordinator.disableAlarm(id);
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      expect(result, isA<AlarmDisabled>());
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('cancelled alarm does not reschedule after fire', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+      await coordinator.cancelAlarm(id);
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      expect(result, isA<AlarmNotSchedulable>());
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('scheduler failure clears instead of persisting a false trigger',
+        () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime fired = scheduler.scheduledTriggers.single;
+      scheduler.scheduleError = StateError('native exploded');
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: fired,
+      );
+
+      expect(result, isA<AlarmScheduleFailed>());
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('post-fire on a missing alarm fails', () async {
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: 999,
+        firedTriggerAt: monday,
+      );
+
+      final AlarmScheduleFailed failed = result as AlarmScheduleFailed;
+      expect(failed.error, isA<StateError>());
+      expect(scheduler.calls, isEmpty);
+    });
+  });
 }
