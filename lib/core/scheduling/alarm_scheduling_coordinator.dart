@@ -32,6 +32,7 @@
 
 import 'package:drift/drift.dart';
 
+import '../alarms/alarm_fire_config.dart';
 import '../alarms/native_alarm_scheduler.dart';
 import '../database/database.dart';
 import '../models/models.dart';
@@ -111,7 +112,14 @@ class AlarmSchedulingCoordinator {
       return AlarmScheduleFailed(e);
     }
     try {
-      await _scheduler.scheduleExactAlarm(alarmId: id, triggerAt: trigger);
+      await _scheduler.scheduleExactAlarm(
+        alarmId: id,
+        triggerAt: trigger,
+        fireConfig: AlarmFireConfig(
+          label: alarm.label,
+          vibrationEnabled: alarm.vibrationEnabled,
+        ),
+      );
     } catch (e) {
       // Native side is empty (the cancel above succeeded): clear the stored
       // trigger so the database cannot claim a schedule that does not exist.

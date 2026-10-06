@@ -1,3 +1,4 @@
+import 'package:alarmx/core/alarms/alarm_fire_config.dart';
 import 'package:alarmx/core/alarms/native_alarm_scheduler.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/models/models.dart';
@@ -22,12 +23,14 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
   final List<String> calls = <String>[];
   final List<int> scheduledIds = <int>[];
   final List<DateTime> scheduledTriggers = <DateTime>[];
+  final List<AlarmFireConfig?> scheduledConfigs = <AlarmFireConfig?>[];
   final List<int> cancelledIds = <int>[];
 
   @override
   Future<void> scheduleExactAlarm({
     required int alarmId,
     required DateTime triggerAt,
+    AlarmFireConfig? fireConfig,
   }) async {
     calls.add('schedule:$alarmId');
     if (scheduleError != null) {
@@ -35,6 +38,7 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
     }
     scheduledIds.add(alarmId);
     scheduledTriggers.add(triggerAt);
+    scheduledConfigs.add(fireConfig);
   }
 
   @override
@@ -81,6 +85,8 @@ void main() {
     int hour = 7,
     int minute = 30,
     bool enabled = true,
+    String? label,
+    bool vibrationEnabled = true,
     RepeatType repeatType = RepeatType.daily,
     DateTime? onceDate,
     RepeatDays? repeatDays,
@@ -90,6 +96,8 @@ void main() {
         hour: Value(hour),
         minute: Value(minute),
         enabled: Value(enabled),
+        label: Value(label),
+        vibrationEnabled: Value(vibrationEnabled),
         repeatType: Value(repeatType.dbValue),
         onceDate: Value(onceDate),
         repeatDays: Value(repeatDays?.mask),
@@ -335,6 +343,36 @@ void main() {
       final int id = await insertAlarm();
 
       await expectLater(coordinator.cancelAlarm(id), throwsA(same(error)));
+    });
+  });
+
+  group('fire config', () {
+    test('passes the persisted label and vibration flag to native', () async {
+      final int id = await insertAlarm(
+        label: 'Gym',
+        vibrationEnabled: false,
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+
+      await coordinator.scheduleAlarm(id, now: monday);
+
+      final AlarmFireConfig config = scheduler.scheduledConfigs.single!;
+      expect(config.label, 'Gym');
+      expect(config.vibrationEnabled, isFalse);
+    });
+
+    test('passes null label with default vibration when unset', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+
+      await coordinator.scheduleAlarm(id, now: monday);
+
+      final AlarmFireConfig config = scheduler.scheduledConfigs.single!;
+      expect(config.label, isNull);
+      expect(config.vibrationEnabled, isTrue);
     });
   });
 }

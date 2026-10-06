@@ -10,6 +10,8 @@ void main() {
     expect(find.text('Schedule test alarm in 10 seconds'), findsOneWidget);
     expect(find.text('Cancel test alarm'), findsOneWidget);
     expect(find.text('Check exact alarm permission'), findsOneWidget);
+    expect(find.text('TEMP: Persisted alarm (~2 min)'), findsOneWidget);
+    expect(find.text('TEMP: Cancel persisted test'), findsOneWidget);
     expect(find.text('No action yet'), findsOneWidget);
   });
 }

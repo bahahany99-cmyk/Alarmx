@@ -30,6 +30,10 @@ import androidx.core.app.NotificationCompat
  * service, which stops the ringtone/vibration, leaves the foreground state (removing
  * the notification) and stops itself. No Flutter UI needs to be open. [onDestroy]
  * runs the same cleanup, so every path is leak-free and idempotent.
+ *
+ * Fire config: a start may carry [EXTRA_LABEL] (shown in the notification,
+ * default text otherwise) and [EXTRA_VIBRATION_ENABLED] (default true).
+ * Starts without them — every legacy test alarm — behave exactly as before.
  */
 class AlarmForegroundService : Service() {
 
@@ -44,6 +48,12 @@ class AlarmForegroundService : Service() {
 
         /** Intent extra key carrying the alarm row id. */
         const val EXTRA_ALARM_ID = "alarm_id"
+
+        /** Optional start extra carrying the alarm label (null = default text). */
+        const val EXTRA_LABEL = "label"
+
+        /** Start extra carrying the vibration flag (default true). */
+        const val EXTRA_VIBRATION_ENABLED = "vibration_enabled"
 
         private const val RINGING_CHANNEL_ID = "alarmx_ringing_channel"
         private const val RINGING_CHANNEL_NAME = "AlarmX Ringing"
@@ -68,6 +78,8 @@ class AlarmForegroundService : Service() {
 
     @Volatile
     private var isRinging = false
+    private var ringLabel: String? = null
+    private var vibrationEnabled = true
     private var ringtone: Ringtone? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -93,6 +105,8 @@ class AlarmForegroundService : Service() {
                     Log.d(TAG, "Alarm already ringing; ignoring duplicate start for id: $alarmId.")
                     return START_NOT_STICKY
                 }
+                ringLabel = intent?.getStringExtra(EXTRA_LABEL)
+                vibrationEnabled = intent?.getBooleanExtra(EXTRA_VIBRATION_ENABLED, true) ?: true
                 startRinging(alarmId)
                 return START_NOT_STICKY
             }
@@ -159,7 +173,7 @@ class AlarmForegroundService : Service() {
         return NotificationCompat.Builder(this, RINGING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("AlarmX")
-            .setContentText("Alarm is ringing")
+            .setContentText(ringLabel?.takeIf { it.isNotBlank() } ?: "Alarm is ringing")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
@@ -220,6 +234,10 @@ class AlarmForegroundService : Service() {
     }
 
     private fun startVibration() {
+        if (!vibrationEnabled) {
+            Log.d(TAG, "Vibration disabled for this alarm; ringing without vibration.")
+            return
+        }
         try {
             val vib: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 getSystemService(VibratorManager::class.java)?.defaultVibrator

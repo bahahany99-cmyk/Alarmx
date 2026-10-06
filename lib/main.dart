@@ -1,5 +1,11 @@
 // TEMPORARY: manual native pipeline test screen. Will be replaced by the real home screen later.
 import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
+import 'package:alarmx/core/database/database.dart';
+import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/repositories/alarm_repository.dart';
+import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
+import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -31,6 +37,20 @@ class NativePipelineTestScreen extends StatefulWidget {
 
 class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
   String _status = 'No action yet';
+  int? _persistedTestAlarmId;
+
+  // TEMP: single database + coordinator for the persisted-alarm test
+  // buttons below. Created lazily on first press, so plain widget tests
+  // that never press them are unaffected. The real app will own the
+  // database lifecycle properly.
+  late final AppDatabase _tempDb = AppDatabase();
+  late final AlarmRepository _tempRepo =
+      DriftAlarmRepository(_tempDb.alarmDao);
+  late final AlarmSchedulingCoordinator _tempCoordinator =
+      AlarmSchedulingCoordinator(
+    repository: _tempRepo,
+    scheduler: const NativeAlarmSchedulerImpl(),
+  );
 
   Future<void> _scheduleTestAlarm() async {
     try {
@@ -97,6 +117,79 @@ class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
     }
   }
 
+  // TEMP (Phase 2.3 device-test hook): creates a real database alarm ~2
+  // minutes out and schedules it through the coordinator, exercising the
+  // full persisted path (Drift -> coordinator -> native extras/ledger ->
+  // AlarmReceiver -> service ring). Each press creates a new row; use the
+  // cancel button to remove the last one.
+  Future<void> _schedulePersistedTestAlarm() async {
+    try {
+      final DateTime target = DateTime.now().add(const Duration(minutes: 2));
+      final int id = await _tempRepo.createAlarm(
+        AlarmsCompanion(
+          hour: Value(target.hour),
+          minute: Value(target.minute),
+          label: const Value<String?>('Persisted test'),
+          repeatType: Value(RepeatType.once.dbValue),
+          onceDate: Value(DateTime(target.year, target.month, target.day)),
+        ),
+      );
+      final AlarmScheduleResult result =
+          await _tempCoordinator.scheduleAlarm(id);
+      _persistedTestAlarmId = id;
+      if (!mounted) {
+        return;
+      }
+      final String outcome = switch (result) {
+        AlarmScheduled(:final triggerAt) =>
+          'Scheduled persisted alarm $id for $triggerAt',
+        AlarmNotSchedulable(:final reason) => 'Not schedulable: $reason',
+        AlarmDisabled() => 'Unexpected: alarm came back disabled',
+        AlarmPermissionMissing() => 'Exact-alarm permission missing',
+        AlarmScheduleFailed(:final error) => 'Schedule failed: $error',
+      };
+      setState(() {
+        _status = outcome;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Persisted test failed: $e';
+      });
+    }
+  }
+
+  // TEMP: cancels the last persisted test alarm and deletes its row.
+  Future<void> _cancelPersistedTestAlarm() async {
+    try {
+      final int? id = _persistedTestAlarmId;
+      if (id == null) {
+        setState(() {
+          _status = 'No persisted test alarm to cancel';
+        });
+        return;
+      }
+      await _tempCoordinator.cancelAlarm(id);
+      await _tempRepo.deleteAlarm(id);
+      _persistedTestAlarmId = null;
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Cancelled and deleted persisted test alarm $id';
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Persisted cancel failed: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,6 +211,14 @@ class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
             ElevatedButton(
               onPressed: _checkPermission,
               child: const Text('Check exact alarm permission'),
+            ),
+            ElevatedButton(
+              onPressed: _schedulePersistedTestAlarm,
+              child: const Text('TEMP: Persisted alarm (~2 min)'),
+            ),
+            ElevatedButton(
+              onPressed: _cancelPersistedTestAlarm,
+              child: const Text('TEMP: Cancel persisted test'),
             ),
             const SizedBox(height: 16),
             Text(_status),

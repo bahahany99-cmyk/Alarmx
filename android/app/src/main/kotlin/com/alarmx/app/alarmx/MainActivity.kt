@@ -16,9 +16,18 @@ import io.flutter.plugin.common.MethodChannel
  *
  * Channel name: `"com.alarmx.app.alarmx/alarm_scheduler"`
  * Methods:
- *   - `scheduleExactAlarm`  args: `{ "alarmId": Int, "triggerAtMillis": Long }`
+ *   - `scheduleExactAlarm`  args: `{ "alarmId": Int, "triggerAtMillis": Long,
+ *       plus for persisted alarms "label": String? and "vibrationEnabled": Boolean }`
  *   - `cancelAlarm`         args: `{ "alarmId": Int }`
  *   - `canScheduleExactAlarms`  args: `{}`
+ *
+ * A schedule call carrying a fire payload (label and/or vibration key
+ * present) is a real persisted alarm: its config is frozen into the
+ * PendingIntent extras and the schedule is recorded in [AlarmScheduleLedger]
+ * so stale deliveries can be dropped on fire. A call with id + trigger only
+ * is a legacy test alarm and keeps the exact Phase 1.2 behavior (id extra
+ * only, no ledger interaction). Both share the requestCode slot namespace:
+ * scheduling either kind for an id replaces whatever was pending for it.
  */
 class MainActivity : FlutterActivity() {
 
@@ -47,7 +56,23 @@ class MainActivity : FlutterActivity() {
                                 )
                                 return@setMethodCallHandler
                             }
-                            scheduleExact(alarmManager, alarmId, triggerAtMillis)
+                            // Presence of either fire-payload key marks a real
+                            // persisted alarm (Dart always sends both together;
+                            // accepting either keeps a partial caller on the
+                            // verifying path with defaults).
+                            val isPersisted = call.hasArgument("label") ||
+                                call.hasArgument("vibrationEnabled")
+                            val fireLabel = call.argument<String>("label")
+                            val fireVibration =
+                                call.argument<Boolean>("vibrationEnabled") ?: true
+                            scheduleExact(
+                                alarmManager,
+                                alarmId,
+                                triggerAtMillis,
+                                fireLabel,
+                                fireVibration,
+                                isPersisted,
+                            )
                             result.success(null)
                         }
 
@@ -86,13 +111,29 @@ class MainActivity : FlutterActivity() {
      * Schedules a one-shot exact alarm. The PendingIntent's request code is
      * the alarmId itself so different alarms never collide; this also lets
      * [cancelExact] find the right PendingIntent to cancel.
+     *
+     * When [isPersisted] is true the fire config is frozen into the
+     * PendingIntent and the schedule is recorded in [AlarmScheduleLedger]
+     * BEFORE the AlarmManager call (see the ledger ordering contract).
      */
     private fun scheduleExact(
         alarmManager: AlarmManager,
         alarmId: Int,
         triggerAtMillis: Long,
+        fireLabel: String?,
+        fireVibration: Boolean,
+        isPersisted: Boolean,
     ) {
-        val pendingIntent = buildAlarmPendingIntent(alarmId)
+        if (isPersisted) {
+            AlarmScheduleLedger.putScheduled(this, alarmId, triggerAtMillis)
+        }
+        val pendingIntent = buildAlarmPendingIntent(
+            alarmId,
+            triggerAtMillis,
+            fireLabel,
+            fireVibration,
+            isPersisted,
+        )
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             triggerAtMillis,
@@ -104,7 +145,9 @@ class MainActivity : FlutterActivity() {
      * Cancels the alarm previously scheduled for [alarmId]. The PendingIntent
      * built here must be equivalent to the one used in [scheduleExact] (same
      * request code + same intent component/action/extras); we reuse the
-     * single helper to guarantee that.
+     * single helper to guarantee that. (Intent extras do not affect
+     * PendingIntent matching, so this id-only form also cancels persisted
+     * schedules that carry a fire payload.)
      *
      * If the alarm already fired and [AlarmForegroundService] is ringing, the
      * service is stopped as well so "cancel" reliably silences the alarm. This
@@ -112,6 +155,9 @@ class MainActivity : FlutterActivity() {
      */
     private fun cancelExact(alarmManager: AlarmManager, alarmId: Int) {
         alarmManager.cancel(buildAlarmPendingIntent(alarmId))
+        // AFTER the AlarmManager cancel (see the ledger ordering contract);
+        // a no-op for legacy test ids the ledger never recorded.
+        AlarmScheduleLedger.removeScheduled(this, alarmId)
         try {
             stopService(Intent(this, AlarmForegroundService::class.java))
         } catch (t: Throwable) {
@@ -125,12 +171,28 @@ class MainActivity : FlutterActivity() {
      * PendingIntents are equivalent (a precondition for cancel to work).
      *
      * `FLAG_IMMUTABLE` is required on API 31+ and is safe here because the
-     * PendingIntent does not carry a mutable extra payload.
+     * extras are frozen when the PendingIntent is created (nothing ever
+     * mutates them afterwards). For persisted alarms the fire config is
+     * frozen into the extras so the receiver can verify and forward it with
+     * no database or engine access; legacy test alarms carry the id only.
      */
-    private fun buildAlarmPendingIntent(alarmId: Int): PendingIntent {
+    private fun buildAlarmPendingIntent(
+        alarmId: Int,
+        triggerAtMillis: Long? = null,
+        fireLabel: String? = null,
+        fireVibration: Boolean = true,
+        isPersisted: Boolean = false,
+    ): PendingIntent {
         val intent = Intent(this, AlarmReceiver::class.java).apply {
             action = "com.alarmx.app.alarmx.ALARM_FIRE"
             putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
+            if (isPersisted && triggerAtMillis != null) {
+                putExtra(AlarmReceiver.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
+                if (fireLabel != null) {
+                    putExtra(AlarmReceiver.EXTRA_LABEL, fireLabel)
+                }
+                putExtra(AlarmReceiver.EXTRA_VIBRATION_ENABLED, fireVibration)
+            }
         }
         return PendingIntent.getBroadcast(
             this,
