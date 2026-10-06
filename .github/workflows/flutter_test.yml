@@ -32,7 +32,47 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        run: flutter test
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee /tmp/test.log
+
+      # Workflow logs are not always reachable from every environment, so mirror
+      # failure output into job annotations, which are available via the API.
+      - name: Surface logs on failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os
+
+          def read_tail(path, count=120):
+              try:
+                  lines = open(path, errors='replace').read().splitlines()
+              except OSError:
+                  return []
+              return lines[-count:]
+
+          chunks = []
+          for name, path in (('analyze', '/tmp/analyze.log'),
+                             ('test', '/tmp/test.log')):
+              lines = read_tail(path)
+              if not lines:
+                  continue
+              chunk, size = [], 0
+              for line in lines:
+                  if size + len(line) > 2500:
+                      chunks.append((name, chunk)); chunk, size = [], 0
+                  chunk.append(line); size += len(line) + 1
+              if chunk:
+                  chunks.append((name, chunk))
+
+          if not chunks:
+              print('::error title=no-logs::no analyze/test log was produced')
+          for name, c in chunks[-10:]:
+              msg = '%0A'.join(l.replace('%', '%25').replace('\r', '') for l in c)
+              print(f'::error title={name}-log::{msg}')
+          PY
