@@ -22,6 +22,14 @@ enum Weekday {
 
   /// Mask with only this day's bit set.
   int get bit => 1 << bitIndex;
+
+  /// Maps a [DateTime] to its weekday.
+  ///
+  /// `DateTime.weekday` counts Monday as 1 through Sunday as 7; this converts
+  /// to the matching [Weekday] value.
+  static Weekday fromDateTime(DateTime date) {
+    return Weekday.values[date.weekday % 7];
+  }
 }
 
 /// Immutable set of selected weekdays, persisted as an int bitmask.
