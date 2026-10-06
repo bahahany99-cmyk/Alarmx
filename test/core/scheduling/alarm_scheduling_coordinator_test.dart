@@ -764,7 +764,7 @@ void main() {
 
     test('reconciling three times stays stable', () async {
       final int a = await insertAlarm();
-      final int b = await insertAlarm(hour: 8);
+      final int b = await insertAlarm(hour: 8, minute: 0);
       final DateTime expectedA = DateTime(2026, 10, 6, 7, 30);
       final DateTime expectedB = DateTime(2026, 10, 6, 8, 0);
 
@@ -828,7 +828,7 @@ void main() {
 
     test('multiple enabled alarms are all reconciled', () async {
       final int a = await insertAlarm();
-      final int b = await insertAlarm(hour: 8);
+      final int b = await insertAlarm(hour: 8, minute: 0);
       final int c = await insertAlarm(hour: 9, minute: 15);
 
       final ReconciliationReport report =
