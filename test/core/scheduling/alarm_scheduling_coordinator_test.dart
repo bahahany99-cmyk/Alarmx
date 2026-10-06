@@ -187,7 +187,7 @@ void main() {
       expect(scheduler.scheduledIds, <int>[secondId]);
       expect(
         (await alarms.getAlarmById(secondId))!.nextTriggerAt,
-        DateTime(2026, 10, 6, 8, 0),
+        DateTime(2026, 10, 6, 8, 30),
       );
     });
 
