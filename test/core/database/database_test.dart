@@ -4,7 +4,8 @@ import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Repository + database integration tests. Every test runs against a fresh
@@ -45,10 +46,10 @@ void main() {
       final Alarm? alarm = await alarms.getAlarmById(id);
       expect(alarm, isNotNull);
       expect(alarm!.hour, 7);
-      expect(alarm!.minute, 30);
-      expect(alarm!.enabled, isTrue);
-      expect(alarm!.repeatType, RepeatType.once.dbValue);
-      expect(alarm!.volume, 80);
+      expect(alarm.minute, 30);
+      expect(alarm.enabled, isTrue);
+      expect(alarm.repeatType, RepeatType.once.dbValue);
+      expect(alarm.volume, 80);
     });
 
     test('insert stores typed repeat columns', () async {
@@ -60,14 +61,14 @@ void main() {
           hour: const Value(8),
           minute: const Value(0),
           label: const Value('Workdays'),
-          repeatType: const Value(RepeatType.custom.dbValue),
+          repeatType: Value(RepeatType.custom.dbValue),
           repeatDays: Value(days.mask),
         ),
       );
       final Alarm? alarm = await alarms.getAlarmById(id);
       expect(alarm!.repeatType, 'custom');
-      expect(RepeatDays(alarm!.repeatDays!).has(Weekday.monday), isTrue);
-      expect(RepeatDays(alarm!.repeatDays!).has(Weekday.tuesday), isFalse);
+      expect(RepeatDays(alarm.repeatDays!).has(Weekday.monday), isTrue);
+      expect(RepeatDays(alarm.repeatDays!).has(Weekday.tuesday), isFalse);
     });
 
     test('update replaces the stored row', () async {
@@ -81,7 +82,7 @@ void main() {
       expect(updated, isTrue);
       final Alarm? reread = await alarms.getAlarmById(id);
       expect(reread!.hour, 9);
-      expect(reread!.label, 'Evening');
+      expect(reread.label, 'Evening');
     });
 
     test('enable and disable flip stored state', () async {
@@ -133,7 +134,7 @@ void main() {
       await missions.createMission(
         MissionsCompanion(
           alarmId: Value(id),
-          type: const Value(MissionType.math.dbValue),
+          type: Value(MissionType.math.dbValue),
         ),
       );
       expect(await alarms.deleteAlarm(id), isTrue);
@@ -161,14 +162,14 @@ void main() {
       await missions.createMission(
         MissionsCompanion(
           alarmId: Value(alarmId),
-          type: const Value(MissionType.qr.dbValue),
+          type: Value(MissionType.qr.dbValue),
           orderIndex: const Value(1),
         ),
       );
       final int firstId = await missions.createMission(
         MissionsCompanion(
           alarmId: Value(alarmId),
-          type: const Value(MissionType.math.dbValue),
+          type: Value(MissionType.math.dbValue),
           orderIndex: const Value(0),
           configJson: const Value('{"count":3}'),
         ),
@@ -190,7 +191,7 @@ void main() {
       final int id = await missions.createMission(
         MissionsCompanion(
           alarmId: Value(alarmId),
-          type: const Value(MissionType.shake.dbValue),
+          type: Value(MissionType.shake.dbValue),
         ),
       );
       expect(await missions.deleteMission(id), isTrue);
@@ -223,7 +224,7 @@ void main() {
       expect(entry!.result, AlarmResult.ongoing.dbValue);
       expect(
         await history.updateHistory(
-          entry!.copyWith(
+          entry.copyWith(
             stoppedAt: Value(second),
             result: AlarmResult.success.dbValue,
           ),
