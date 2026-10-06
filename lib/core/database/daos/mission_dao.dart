@@ -28,6 +28,11 @@ class MissionDao extends DatabaseAccessor<AppDatabase> with _$MissionDaoMixin {
     return into(missions).insert(entry);
   }
 
+  /// Returns a single mission by its primary key, or `null` if not found.
+  Future<Mission?> getMissionById(int id) {
+    return (select(missions)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
   /// Replaces the row with the same id as [entry].
   Future<bool> updateMission(Mission entry) {
     return update(missions).replace(entry);
@@ -38,5 +43,11 @@ class MissionDao extends DatabaseAccessor<AppDatabase> with _$MissionDaoMixin {
   /// but the method is provided as an explicit bulk operation).
   Future<int> deleteMissionsForAlarm(int alarmId) {
     return (delete(missions)..where((t) => t.alarmId.equals(alarmId))).go();
+  }
+
+  /// Deletes the mission with the given id. Returns the removed row count
+  /// (`0` when no mission with that id exists).
+  Future<int> deleteMission(int id) {
+    return (delete(missions)..where((t) => t.id.equals(id))).go();
   }
 }

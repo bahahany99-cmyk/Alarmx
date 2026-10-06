@@ -35,4 +35,29 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   int get schemaVersion => 1;
+
+  /// Migration strategy.
+  ///
+  /// Version history:
+  ///   - v1: baseline — the four tables in `tables.dart`, created by
+  ///     [Migrator.createAll]. There are no shipped users yet, so no upgrade
+  ///     path exists. When `schemaVersion` is bumped, add an explicit
+  ///     `onUpgrade` step here for every version jump (never rely on the
+  ///     default destructive fallback once the app is released).
+  ///
+  /// [MigrationStrategy.beforeOpen] enables foreign-key enforcement on every
+  /// connection (including in-memory test databases), which is what makes
+  /// the declared `Missions.alarmId ... ON DELETE CASCADE` actually work —
+  /// SQLite does not enforce foreign keys unless this pragma is set.
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      beforeOpen: (OpeningDetails details) async {
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
+    );
+  }
 }

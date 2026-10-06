@@ -22,6 +22,12 @@ class AlarmHistoryDao extends DatabaseAccessor<AppDatabase>
     return update(alarmHistory).replace(entry);
   }
 
+  /// Returns a single history entry by its primary key, or `null` if not found.
+  Future<AlarmHistoryData?> getHistoryById(int id) {
+    return (select(alarmHistory)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   /// Returns every history row for the given [alarmId], newest first.
   Future<List<AlarmHistoryData>> getHistoryForAlarm(int alarmId) {
     return (select(alarmHistory)
