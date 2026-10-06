@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+      - "arena/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,6 +34,23 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      # The Gradle wrapper (gradlew, gradlew.bat, gradle-wrapper.jar) and
+      # local.properties are intentionally git-ignored by the Flutter template, so a
+      # fresh checkout is missing the Android bootstrap files the build needs.
+      # `flutter create` regenerates them in place.
+      - name: Restore missing Android bootstrap files
+        run: flutter create --platforms=android .
+
+      # `flutter create` also re-renders template files that are tracked in git
+      # (AndroidManifest.xml, build.gradle.kts, MainActivity.kt, ...). Restore the
+      # committed versions so the project's own configuration — including the
+      # androidx.core:core-ktx dependency and the alarm permissions — always wins.
+      # Untracked files generated above (the Gradle wrapper) are kept.
+      - name: Restore committed project files
+        run: |
+          git checkout -- .
+          git status --short
 
       - name: Install Flutter dependencies
         run: flutter pub get
