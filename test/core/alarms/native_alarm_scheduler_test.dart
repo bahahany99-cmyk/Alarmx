@@ -88,7 +88,10 @@ void main() {
 
   test('permission check returns the native answer', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall call) async => true);
+        .setMockMethodCallHandler(channel, (MethodCall call) async {
+      calls.add(call);
+      return true;
+    });
 
     expect(await scheduler.canScheduleExactAlarms(), isTrue);
     expect(calls.single.method, 'canScheduleExactAlarms');
