@@ -56,7 +56,34 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee /tmp/build.log
+
+      # Workflow logs are not always reachable from every environment, so mirror the
+      # tail of a failed build into job annotations, which are available via the API.
+      - name: Surface build log on failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os
+          try:
+              lines = open('/tmp/build.log', errors='replace').read().splitlines()
+          except OSError:
+              lines = ['no /tmp/build.log produced']
+          tail = lines[-250:]
+          chunk, size = [], 0
+          chunks = []
+          for line in tail:
+              if size + len(line) > 2500:
+                  chunks.append(chunk); chunk, size = [], 0
+              chunk.append(line); size += len(line) + 1
+          if chunk:
+              chunks.append(chunk)
+          for i, c in enumerate(chunks[-8:]):
+              msg = '%0A'.join(l.replace('%', '%25').replace('\r', '') for l in c)
+              print(f'::error title=build-log-{i}::{msg}')
+          PY
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
