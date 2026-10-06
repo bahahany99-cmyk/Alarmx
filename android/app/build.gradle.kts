@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -46,4 +47,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Required by AlarmReceiver.kt (androidx.core.app.NotificationCompat) and by the
+    // AndroidX runtime in general. Pinned explicitly so the build does not depend on a
+    // transitive version being pulled in by plugins.
+    implementation("androidx.core:core-ktx:1.17.0")
 }
