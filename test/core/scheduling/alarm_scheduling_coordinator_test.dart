@@ -597,4 +597,377 @@ void main() {
       expect(scheduler.calls, isEmpty);
     });
   });
+
+  group('reconcile after boot', () {
+    test('keeps a valid future trigger', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt!;
+      expect(stored, DateTime(2026, 10, 6, 7, 30));
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.processed, 1);
+      expect(report.scheduled, 1);
+      expect(report.failed, 0);
+      expect(scheduler.scheduledTriggers, <DateTime>[stored, stored]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+    });
+
+    test('repairs a past trigger', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime wednesday = DateTime(2026, 10, 7, 10, 0);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: wednesday);
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 8, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('schedules a null trigger fresh', () async {
+      final int id = await insertAlarm();
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 6, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('clears a past one-time alarm without rescheduling', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.scheduled, 0);
+      expect(report.unschedulable, 1);
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('custom alarm with past trigger chains to next selected day',
+        () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(
+          <Weekday>{Weekday.monday, Weekday.wednesday, Weekday.friday},
+        ),
+        repeatType: RepeatType.custom,
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+      expect(
+        scheduler.scheduledTriggers.single,
+        DateTime(2026, 10, 7, 7, 30),
+      );
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 9, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('disabled alarm with stale trigger is cleared, never scheduled',
+        () async {
+      final int id = await insertAlarm(label: 'Gym');
+      await coordinator.scheduleAlarm(id, now: monday);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNotNull);
+      // Bypass the coordinator so the stale trigger stays behind.
+      await alarms.setAlarmEnabled(id, false);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.disabledCleared, 1);
+      expect(report.scheduled, 0);
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('disabled alarm drives a native cancel for stale ledger state',
+        () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      await alarms.setAlarmEnabled(id, false);
+
+      await coordinator.reconcileSchedules(now: monday);
+
+      // cancelAlarm is what removes the native schedule + ledger entry.
+      expect(scheduler.cancelledIds, contains(id));
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('future one-time alarm is scheduled', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 8),
+      );
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 8, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('past one-time alarm is never recreated, even across passes',
+        () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      final DateTime ref = DateTime(2026, 10, 7, 10, 0);
+
+      await coordinator.reconcileSchedules(now: ref);
+      final ReconciliationReport second =
+          await coordinator.reconcileSchedules(now: ref);
+
+      expect(second.unschedulable, 1);
+      expect(scheduler.scheduledIds, isEmpty);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('reconciling twice yields the same effective state', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt!;
+
+      await coordinator.reconcileSchedules(now: monday);
+      final ReconciliationReport second =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(second.scheduled, 1);
+      expect(second.failed, 0);
+      expect(scheduler.scheduledTriggers, <DateTime>[stored, stored, stored]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+    });
+
+    test('reconciling three times stays stable', () async {
+      final int a = await insertAlarm();
+      final int b = await insertAlarm(hour: 8);
+      final DateTime expectedA = DateTime(2026, 10, 6, 7, 30);
+      final DateTime expectedB = DateTime(2026, 10, 6, 8, 0);
+
+      for (int i = 0; i < 3; i++) {
+        final ReconciliationReport report =
+            await coordinator.reconcileSchedules(now: monday);
+        expect(report.processed, 2);
+        expect(report.scheduled, 2);
+        expect(report.failed, 0);
+      }
+
+      expect((await alarms.getAlarmById(a))!.nextTriggerAt, expectedA);
+      expect((await alarms.getAlarmById(b))!.nextTriggerAt, expectedB);
+      expect(
+        scheduler.scheduledTriggers.where((DateTime t) => t == expectedA),
+        hasLength(3),
+      );
+      expect(
+        scheduler.scheduledTriggers.where((DateTime t) => t == expectedB),
+        hasLength(3),
+      );
+    });
+
+    test('missing native state is repaired by re-issuing the schedule',
+        () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final int before = scheduler.scheduledIds.length;
+
+      await coordinator.reconcileSchedules(now: monday);
+
+      // The re-issue is what recreates the wiped native schedule + ledger.
+      expect(scheduler.scheduledIds.length, before + 1);
+      expect(scheduler.scheduledIds.last, id);
+    });
+
+    test('valid schedule token is preserved, not rewritten', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt!;
+
+      await coordinator.reconcileSchedules(now: monday);
+
+      expect(scheduler.scheduledTriggers.last, stored);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+    });
+
+    test('missing permission is reported and scheduled nothing', () async {
+      scheduler.canSchedule = false;
+      final int id = await insertAlarm();
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.permissionMissing, 1);
+      expect(report.scheduled, 0);
+      expect(scheduler.scheduledIds, isEmpty);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('multiple enabled alarms are all reconciled', () async {
+      final int a = await insertAlarm();
+      final int b = await insertAlarm(hour: 8);
+      final int c = await insertAlarm(hour: 9, minute: 15);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.processed, 3);
+      expect(report.scheduled, 3);
+      expect(report.failed, 0);
+      expect(
+        (await alarms.getAlarmById(a))!.nextTriggerAt,
+        DateTime(2026, 10, 6, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(b))!.nextTriggerAt,
+        DateTime(2026, 10, 6, 8, 0),
+      );
+      expect(
+        (await alarms.getAlarmById(c))!.nextTriggerAt,
+        DateTime(2026, 10, 6, 9, 15),
+      );
+    });
+
+    test('mixed once/daily/custom/disabled alarms reconcile per type',
+        () async {
+      final int once = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 8),
+      );
+      final int daily = await insertAlarm();
+      final int custom = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(<Weekday>{Weekday.friday}),
+        repeatType: RepeatType.custom,
+      );
+      final int empty = await insertAlarm(repeatType: RepeatType.custom);
+      final int off = await insertAlarm(label: 'Off');
+      await coordinator.scheduleAlarm(daily, now: monday);
+      await coordinator.scheduleAlarm(off, now: monday);
+      await alarms.setAlarmEnabled(off, false);
+      final DateTime ref = DateTime(2026, 10, 7, 10, 0);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: ref);
+
+      expect(report.processed, 5);
+      expect(report.scheduled, 3);
+      expect(report.unschedulable, 1);
+      expect(report.disabledCleared, 1);
+      expect(report.failed, 0);
+      expect(
+        (await alarms.getAlarmById(once))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(daily))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(custom))!.nextTriggerAt,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+      expect((await alarms.getAlarmById(empty))!.nextTriggerAt, isNull);
+      expect((await alarms.getAlarmById(off))!.nextTriggerAt, isNull);
+    });
+
+    test('Sunday-only alarm reconciles to Sunday', () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(<Weekday>{Weekday.sunday}),
+        repeatType: RepeatType.custom,
+      );
+      final DateTime saturday = DateTime(2026, 10, 10, 10, 0);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: saturday);
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 11, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('scheduler failure is counted and persists no trigger', () async {
+      final int id = await insertAlarm();
+      scheduler.scheduleError = StateError('native exploded');
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.failed, 1);
+      expect(report.scheduled, 0);
+      expect(scheduler.scheduledIds, isEmpty);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('stale fire token stays rejected after reconciliation', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime old = scheduler.scheduledTriggers.single;
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      final AlarmScheduleResult result = await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: old,
+      );
+
+      expect(result, isA<AlarmNotSchedulable>());
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+    });
+
+    test('reconciliation leaves unrelated alarm values untouched', () async {
+      final int clean = await insertAlarm(enabled: false, label: 'Keep');
+      final int worker = await insertAlarm();
+
+      await coordinator.reconcileSchedules(now: monday);
+
+      final Alarm kept = (await alarms.getAlarmById(clean))!;
+      expect(kept.enabled, isFalse);
+      expect(kept.label, 'Keep');
+      expect(kept.hour, 7);
+      expect(kept.minute, 30);
+      expect(kept.nextTriggerAt, isNull);
+      expect(
+        (await alarms.getAlarmById(worker))!.nextTriggerAt,
+        DateTime(2026, 10, 6, 7, 30),
+      );
+    });
+
+    test('empty database reconciles to an empty report', () async {
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.processed, 0);
+      expect(report.scheduled, 0);
+      expect(report.failed, 0);
+      expect(scheduler.calls, isEmpty);
+    });
+  });
 }

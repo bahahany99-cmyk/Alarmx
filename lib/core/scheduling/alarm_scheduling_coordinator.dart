@@ -280,6 +280,71 @@ class AlarmSchedulingCoordinator {
     return AlarmScheduled(next);
   }
 
+  /// Reconciles every stored alarm with the OS after boot (or any event
+  /// that may have wiped native schedules).
+  ///
+  /// Flow per alarm: enabled -> [scheduleAlarm] (recomputes the correct
+  /// trigger strictly after [now], re-issues the native schedule through
+  /// the alarm's own PendingIntent slot, persists it); disabled ->
+  /// [cancelAlarm] (removes any stale native schedule/ledger entry, clears
+  /// the trigger). Re-issuing an already-correct trigger is the repair,
+  /// not a duplicate: the slot and ledger token are overwritten in place.
+  /// Each alarm is isolated: unexpected errors are counted in the report
+  /// and the pass continues with the rest.
+  ///
+  /// [now] defaults to the current local time and exists so tests can pin
+  /// time deterministically. Only a total failure to load the alarm list
+  /// throws; per-alarm problems are reported via [ReconciliationReport].
+  Future<ReconciliationReport> reconcileSchedules({DateTime? now}) async {
+    final DateTime ref = now ?? DateTime.now();
+    final List<Alarm> alarms = await _repository.getAlarms();
+    int scheduled = 0;
+    int unschedulable = 0;
+    int disabledCleared = 0;
+    int permissionMissing = 0;
+    int failed = 0;
+    for (final Alarm alarm in alarms) {
+      if (!alarm.enabled) {
+        try {
+          await cancelAlarm(alarm.id);
+          disabledCleared++;
+        } catch (_) {
+          failed++;
+        }
+        continue;
+      }
+      final AlarmScheduleResult result;
+      try {
+        result = await scheduleAlarm(alarm.id, now: ref);
+      } catch (_) {
+        failed++;
+        continue;
+      }
+      switch (result) {
+        case AlarmScheduled():
+          scheduled++;
+        case AlarmNotSchedulable():
+          unschedulable++;
+        case AlarmDisabled():
+          // Row flipped to disabled between the listing and the scheduling;
+          // scheduleAlarm already cancelled its strays and cleared it.
+          disabledCleared++;
+        case AlarmPermissionMissing():
+          permissionMissing++;
+        case AlarmScheduleFailed():
+          failed++;
+      }
+    }
+    return ReconciliationReport(
+      processed: alarms.length,
+      scheduled: scheduled,
+      unschedulable: unschedulable,
+      disabledCleared: disabledCleared,
+      permissionMissing: permissionMissing,
+      failed: failed,
+    );
+  }
+
   /// Cancels the OS schedule for [id] and clears its stored trigger.
   ///
   /// Does not delete the database record. Idempotent: unknown ids are a

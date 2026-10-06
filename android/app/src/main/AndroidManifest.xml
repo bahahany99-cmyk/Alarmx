@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!--
+      Allows the app to receive BOOT_COMPLETED so Phase 2.5 schedule
+      reconciliation can restore alarms after a restart. Install-time
+      (normal) permission, no runtime prompt.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
       Required to post notifications on Android 13+ (API 33+), including the
       foreground service notification. This is a runtime permission; without
       it the ringing service cannot run in the foreground and stops itself.
@@ -65,6 +72,21 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.alarmx.app.alarmx.ALARM_FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          Phase 2.5 boot reconciliation. Exported because BOOT_COMPLETED is
+          delivered by the system (an outside sender); the broadcast is
+          system-protected so no other app can spoof it. Runs a short-lived
+          headless Dart pass that re-issues schedules, then exits; starts no
+          UI and no permanent service.
+        -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

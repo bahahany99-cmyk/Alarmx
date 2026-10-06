@@ -71,3 +71,53 @@ final class AlarmScheduleFailed extends AlarmScheduleResult {
   /// not know about (persist + rollback both failed). Null otherwise.
   final DateTime? scheduledButNotPersisted;
 }
+
+/// Summary of an [AlarmSchedulingCoordinator.reconcileSchedules] pass.
+///
+/// Counts are informational/diagnostic: the pass itself is idempotent, so
+/// re-running it over already-consistent state yields the same effective
+/// schedules (each enabled alarm is re-issued through its own PendingIntent
+/// slot, which replaces rather than duplicates, and the ledger token is
+/// overwritten with the correct trigger).
+final class ReconciliationReport {
+  const ReconciliationReport({
+    this.processed = 0,
+    this.scheduled = 0,
+    this.unschedulable = 0,
+    this.disabledCleared = 0,
+    this.permissionMissing = 0,
+    this.failed = 0,
+  });
+
+  /// Alarms examined (enabled + disabled).
+  final int processed;
+
+  /// Enabled alarms now scheduled with the OS at their correct trigger.
+  final int scheduled;
+
+  /// Enabled alarms with no upcoming occurrence (past one-time alarms,
+  /// weekday alarms with nothing selected): left unscheduled, trigger null.
+  final int unschedulable;
+
+  /// Disabled alarms whose stale native/trigger state was cleared.
+  final int disabledCleared;
+
+  /// Enabled alarms skipped for missing exact-alarm permission.
+  final int permissionMissing;
+
+  /// Alarms that raised an unexpected error (bridge/database) and were
+  /// skipped so the rest of the pass could continue.
+  final int failed;
+
+  /// Serializes the counters for the boot completion handshake.
+  Map<String, Object?> toMap() {
+    return <String, Object?>{
+      'processed': processed,
+      'scheduled': scheduled,
+      'unschedulable': unschedulable,
+      'disabledCleared': disabledCleared,
+      'permissionMissing': permissionMissing,
+      'failed': failed,
+    };
+  }
+}
