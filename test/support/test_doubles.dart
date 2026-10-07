@@ -17,6 +17,7 @@ import 'package:alarmx/core/alarms/native_alarm_scheduler.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
@@ -92,10 +93,12 @@ class TestStack {
     repository = DriftAlarmRepository(db.alarmDao);
     settings = DriftAppSettingsRepository(db.appSettingsDao);
     missions = MissionService(DriftMissionRepository(db.missionDao));
+    history = DriftAlarmHistoryRepository(db.alarmHistoryDao);
     scheduler = FakeNativeAlarmScheduler();
     coordinator = AlarmSchedulingCoordinator(
       repository: repository,
       scheduler: scheduler,
+      history: history,
     );
     controller = AlarmController(
       repository: repository,
@@ -107,6 +110,7 @@ class TestStack {
   late final AlarmRepository repository;
   late final AppSettingsRepository settings;
   late final MissionService missions;
+  late final AlarmHistoryRepository history;
   late final FakeNativeAlarmScheduler scheduler;
   late final AlarmSchedulingCoordinator coordinator;
   late final AlarmController controller;

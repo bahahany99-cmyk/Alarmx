@@ -38,10 +38,12 @@ import '../alarms/alarm_fire_config.dart';
 import '../alarms/native_alarm_scheduler.dart';
 import '../database/database.dart';
 import '../models/models.dart';
+import '../repositories/alarm_history_repository.dart';
 import '../repositories/alarm_repository.dart';
 import 'alarm_schedule.dart';
 import 'alarm_schedule_result.dart';
 import 'next_occurrence_calculator.dart';
+import 'snooze_policy.dart';
 
 /// Orchestrates database state and OS alarm schedules.
 class AlarmSchedulingCoordinator {
@@ -49,13 +51,20 @@ class AlarmSchedulingCoordinator {
     required AlarmRepository repository,
     required NativeAlarmScheduler scheduler,
     NextOccurrenceCalculator calculator = const NextOccurrenceCalculator(),
+    AlarmHistoryRepository? history,
   })  : _repository = repository,
         _scheduler = scheduler,
-        _calculator = calculator;
+        _calculator = calculator,
+        _history = history;
 
   final AlarmRepository _repository;
   final NativeAlarmScheduler _scheduler;
   final NextOccurrenceCalculator _calculator;
+
+  /// Episode history for snooze counting and pending-snooze preservation.
+  /// Null (tests, early shells) disables both: the snooze count reads as
+  /// zero and reconciliation always recomputes from recurrence.
+  final AlarmHistoryRepository? _history;
 
   /// Schedules the alarm's next occurrence with the OS.
   ///
@@ -280,6 +289,136 @@ class AlarmSchedulingCoordinator {
     return AlarmScheduled(next);
   }
 
+  /// Snoozes a ringing alarm: reschedules the current occurrence to
+  /// `now + snoozeMinutes` through the normal native pipeline.
+  ///
+  /// Flow: load -> skip when disabled (cancelling strays) -> reject when
+  /// [firedTriggerAt] no longer matches the stored schedule (stale,
+  /// duplicate, or already-snoozed ring; the database is left untouched)
+  /// -> reject when snooze is disabled, misconfigured, or exhausted (the
+  /// used count comes from the episode's history row) -> otherwise require
+  /// exact-alarm permission -> cancel previous native schedule -> schedule
+  /// the snooze trigger -> persist it to `nextTriggerAt`.
+  ///
+  /// The snooze is temporary: hour/minute/recurrence are never modified,
+  /// so the snoozed ring chains back to the normal occurrence via
+  /// [rescheduleAfterFire]. Callers record the snooze (history count,
+  /// pending target) and THEN stop the native ring, so the post-fire
+  /// handoff finds a diverted token and stays out of the way. Never
+  /// throws for domain or scheduler failures; see [AlarmScheduleResult].
+  Future<AlarmScheduleResult> snoozeAlarm({
+    required int alarmId,
+    required DateTime firedTriggerAt,
+    DateTime? now,
+  }) async {
+    final DateTime at = now ?? DateTime.now();
+    final Alarm? alarm = await _repository.getAlarmById(alarmId);
+    if (alarm == null) {
+      return AlarmScheduleFailed(StateError('Alarm $alarmId not found.'));
+    }
+    if (!alarm.enabled) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmDisabled();
+    }
+    if (alarm.nextTriggerAt?.millisecondsSinceEpoch !=
+        firedTriggerAt.millisecondsSinceEpoch) {
+      return const AlarmNotSchedulable(
+        'Fired trigger is not the current schedule.',
+      );
+    }
+    if (!alarm.snoozeEnabled) {
+      return const AlarmNotSchedulable('Snooze is disabled for this alarm.');
+    }
+    if (!SnoozePolicy.isValidMinutes(alarm.snoozeMinutes)) {
+      return const AlarmNotSchedulable('Snooze duration is invalid.');
+    }
+    if (!SnoozePolicy.isValidMaxCount(alarm.snoozeMaxCount)) {
+      return const AlarmNotSchedulable('Snooze limit is invalid.');
+    }
+    final int used = await _usedSnoozes(alarmId);
+    if (!SnoozePolicy.canSnooze(
+      enabled: alarm.snoozeEnabled,
+      minutes: alarm.snoozeMinutes,
+      maxCount: alarm.snoozeMaxCount,
+      usedCount: used,
+    )) {
+      return const AlarmNotSchedulable('No snoozes remaining.');
+    }
+    final DateTime target =
+        at.add(Duration(minutes: alarm.snoozeMinutes));
+    final bool allowed;
+    try {
+      allowed = await _scheduler.canScheduleExactAlarms();
+    } catch (e) {
+      return AlarmScheduleFailed(e);
+    }
+    if (!allowed) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarmId);
+        await _clearNextTrigger(alarmId);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmPermissionMissing();
+    }
+    try {
+      await _scheduler.cancelAlarm(alarmId: alarmId);
+    } catch (e) {
+      return AlarmScheduleFailed(e);
+    }
+    try {
+      await _scheduler.scheduleExactAlarm(
+        alarmId: alarmId,
+        triggerAt: target,
+        fireConfig: AlarmFireConfig(
+          label: alarm.label,
+          vibrationEnabled: alarm.vibrationEnabled,
+        ),
+      );
+    } catch (e) {
+      await _clearBestEffort(alarmId);
+      return AlarmScheduleFailed(e);
+    }
+    try {
+      final bool persisted = await _persistNextTrigger(alarmId, target);
+      if (!persisted) {
+        throw StateError('Alarm $alarmId no longer exists.');
+      }
+    } catch (e) {
+      return _rollbackAfterPersistFailure(alarmId, target, e);
+    }
+    return AlarmScheduled(target);
+  }
+
+  /// Snoozes already used in the alarm's open episode: the newest history
+  /// row's count when that row is still open, else 0. Only the newest row
+  /// can own an open episode (see `ringing_history.dart`). Read failures
+  /// degrade to 0: a failed count read must not strand the ringing
+  /// screen, and the limit re-applies once reads work.
+  Future<int> _usedSnoozes(int alarmId) async {
+    final AlarmHistoryRepository? history = _history;
+    if (history == null) {
+      return 0;
+    }
+    try {
+      final List<AlarmHistoryData> rows =
+          await history.getHistoryForAlarm(alarmId);
+      if (rows.isNotEmpty &&
+          rows.first.result == AlarmResult.ongoing.dbValue) {
+        final int count = rows.first.snoozeCount;
+        return count < 0 ? 0 : count;
+      }
+    } catch (_) {
+      return 0;
+    }
+    return 0;
+  }
+
   /// Reconciles every stored alarm with the OS after boot (or any event
   /// that may have wiped native schedules).
   ///
@@ -313,9 +452,11 @@ class AlarmSchedulingCoordinator {
         }
         continue;
       }
+      final AlarmScheduleResult? preserved =
+          await _preservePendingSnooze(alarm, ref);
       final AlarmScheduleResult result;
       try {
-        result = await scheduleAlarm(alarm.id, now: ref);
+        result = preserved ?? await scheduleAlarm(alarm.id, now: ref);
       } catch (_) {
         failed++;
         continue;
@@ -343,6 +484,66 @@ class AlarmSchedulingCoordinator {
       permissionMissing: permissionMissing,
       failed: failed,
     );
+  }
+
+  /// Re-issues a pending snooze trigger instead of recomputing it.
+  ///
+  /// A snoozed alarm holds its temporary trigger in `nextTriggerAt` while
+  /// its episode row stays open. Reconciliation (boot, app start,
+  /// lifecycle) must re-issue that stored trigger as-is — recomputing
+  /// from hour/minute/recurrence would silently cancel the snooze.
+  /// Returns the outcome to report, or `null` when this alarm holds no
+  /// pending snooze (the normal [scheduleAlarm] path applies). A stale
+  /// open row over a normal future trigger re-issues the same value,
+  /// which is harmless: same slot, same token, same fire config.
+  Future<AlarmScheduleResult?> _preservePendingSnooze(
+    Alarm alarm,
+    DateTime now,
+  ) async {
+    final AlarmHistoryRepository? history = _history;
+    final DateTime? stored = alarm.nextTriggerAt;
+    if (history == null || stored == null || !stored.isAfter(now)) {
+      return null;
+    }
+    final List<AlarmHistoryData> rows;
+    try {
+      rows = await history.getHistoryForAlarm(alarm.id);
+    } catch (_) {
+      return null;
+    }
+    if (rows.isEmpty || rows.first.result != AlarmResult.ongoing.dbValue) {
+      return null;
+    }
+    final bool allowed;
+    try {
+      allowed = await _scheduler.canScheduleExactAlarms();
+    } catch (e) {
+      return AlarmScheduleFailed(e);
+    }
+    if (!allowed) {
+      try {
+        await _scheduler.cancelAlarm(alarmId: alarm.id);
+        await _clearNextTrigger(alarm.id);
+      } catch (e) {
+        return AlarmScheduleFailed(e);
+      }
+      return const AlarmPermissionMissing();
+    }
+    try {
+      await _scheduler.cancelAlarm(alarmId: alarm.id);
+      await _scheduler.scheduleExactAlarm(
+        alarmId: alarm.id,
+        triggerAt: stored,
+        fireConfig: AlarmFireConfig(
+          label: alarm.label,
+          vibrationEnabled: alarm.vibrationEnabled,
+        ),
+      );
+    } catch (e) {
+      await _clearBestEffort(alarm.id);
+      return AlarmScheduleFailed(e);
+    }
+    return AlarmScheduled(stored);
   }
 
   /// Cancels the OS schedule for [id] and clears its stored trigger.
