@@ -51,15 +51,13 @@ jobs:
             code=0
             timeout 300 flutter test --timeout 60s "$@" > "/tmp/probe_$name.log" 2>&1 || { code=$?; fail=1; }
             if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
-            tail -8 "/tmp/probe_$name.log"
+            if [ $code -eq 124 ]; then echo "--- $name killed-log tail (in-flight shards) ---"; tail -60 "/tmp/probe_$name.log"; else tail -8 "/tmp/probe_$name.log"; fi
             echo "=== PROBE $name END ==="
           }
           {
             fail=0
-            run_probe R1-formatters-home test/features/home/alarm_formatters_test.dart test/features/home/home_screen_test.dart
-            run_probe R2-editor-shell test/features/alarm_editor/alarm_editor_screen_test.dart test/widget_test.dart
-            run_probe R3-new-nonwidget test/core/l10n/ test/features/alarm_editor/alarm_draft_test.dart test/core/alarms/alarm_controller_test.dart
-            run_probe R4-home-editor test/features/home/home_screen_test.dart test/features/alarm_editor/alarm_editor_screen_test.dart
+            run_probe S1-new-together test/core/l10n/ test/core/alarms/alarm_controller_test.dart test/features/ test/widget_test.dart
+            run_probe S2-new-concurrency2 --concurrency=2 test/core/l10n/ test/core/alarms/alarm_controller_test.dart test/features/ test/widget_test.dart
             echo "ALL PROBES DONE, failures=$fail"
             test "$fail" -eq 0
           } 2>&1 | tee /tmp/test.log
