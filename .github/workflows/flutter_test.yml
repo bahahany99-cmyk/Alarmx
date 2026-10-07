@@ -43,6 +43,16 @@ jobs:
         run: |
           set -o pipefail
           flutter test --concurrency=2 2>&1 | tee /tmp/test.log
+      # TEMPORARY B3 probe: name the failing tests (removed before gating).
+      - name: TEMP fail-name probe
+        if: failure()
+        run: |
+          grep -a '❌' /tmp/test.log | head -40 | python3 -c "
+          import sys
+          for line in sys.stdin:
+              line = line.strip().replace('%', '%25')
+              print(f'::error title=fail-name::{line}')
+          "
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
       - name: Surface logs on failure
