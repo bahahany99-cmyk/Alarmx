@@ -155,7 +155,7 @@ void main() {
           startedAt: ringTime.subtract(const Duration(minutes: 5)),
           stoppedAt: Value<DateTime?>(target),
           result: Value<String>(AlarmResult.ongoing.dbValue),
-          snoozeCount: Value<int>(1),
+          snoozeCount: const Value<int>(1),
         ),
       );
       final RingingSession session = newSession(
@@ -181,7 +181,7 @@ void main() {
           stoppedAt:
               Value<DateTime?>(ringTime.subtract(const Duration(days: 1))),
           result: Value<String>(AlarmResult.ongoing.dbValue),
-          snoozeCount: Value<int>(2),
+          snoozeCount: const Value<int>(2),
         ),
       );
       final RingingSession session = newSession(id);
