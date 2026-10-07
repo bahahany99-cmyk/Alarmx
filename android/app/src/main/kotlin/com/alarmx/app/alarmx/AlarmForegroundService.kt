@@ -23,7 +23,8 @@ import androidx.core.app.NotificationCompat
  * Foreground service that rings a fired alarm.
  *
  * Pipeline: `AlarmManager` → [AlarmReceiver] → (`ContextCompat.startForegroundService`)
- * → this service → `startForeground()` → ongoing ringing notification + default alarm
+ * → this service → `startForeground()` → ongoing ringing notification (with a
+ * full-screen intent opening [FullScreenAlarmActivity]) + default alarm
  * ringtone + repeating vibration.
  *
  * Stopping: the "Stop alarm" notification action sends [ACTION_STOP] back to this
@@ -187,11 +188,16 @@ class AlarmForegroundService : Service() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // Full-screen alarm surface: launched by the system from this
+        // notification when the alarm fires (suppressed only while the
+        // device already shows something more urgent).
+        val fullScreenIntent = buildFullScreenPendingIntent(alarmId)
 
         return NotificationCompat.Builder(this, RINGING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("AlarmX")
             .setContentText(ringLabel?.takeIf { it.isNotBlank() } ?: "Alarm is ringing")
+            .setFullScreenIntent(fullScreenIntent, true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
@@ -207,6 +213,31 @@ class AlarmForegroundService : Service() {
                 stopIntent,
             )
             .build()
+    }
+
+    /**
+     * Builds the full-screen intent opening [FullScreenAlarmActivity] for
+     * this ring. The requestCode is the alarm id (same identity as the
+     * firing PendingIntent; the activity component keeps the two intents
+     * distinct). The frozen fire extras travel along so the screen shows
+     * the same alarm event the service is ringing; legacy test rings
+     * carry the id only.
+     */
+    private fun buildFullScreenPendingIntent(alarmId: Int): PendingIntent {
+        val intent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(FullScreenAlarmActivity.EXTRA_ALARM_ID, alarmId)
+            ringLabel?.let { putExtra(FullScreenAlarmActivity.EXTRA_LABEL, it) }
+            ringTriggerAtMillis?.let {
+                putExtra(FullScreenAlarmActivity.EXTRA_TRIGGER_AT_MILLIS, it)
+            }
+        }
+        return PendingIntent.getActivity(
+            this,
+            alarmId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun ensureRingingChannel(notificationManager: NotificationManager) {
@@ -299,6 +330,8 @@ class AlarmForegroundService : Service() {
      * paths and [onDestroy]. When the call ends an actual ring of a
      * persisted alarm it also fires the one-shot post-fire handoff
      * ([MainActivity.notifyAlarmStopped]); duplicate calls report nothing.
+     * Any ended ring additionally sends the in-process stopped broadcast so
+     * an open [FullScreenAlarmActivity] closes itself.
      */
     private fun stopRinging() {
         val wasRinging = isRinging
@@ -331,10 +364,25 @@ class AlarmForegroundService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Error leaving foreground state.", e)
         }
+        if (!wasRinging) {
+            return
+        }
+        // The ring ended: tell any open alarm screen to close (all rings,
+        // including legacy test rings, which also show the screen).
+        try {
+            sendBroadcast(
+                Intent(FullScreenAlarmActivity.ACTION_ALARM_STOPPED).apply {
+                    `package` = packageName
+                    putExtra(FullScreenAlarmActivity.EXTRA_ALARM_ID, stoppedAlarmId)
+                },
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not send alarm-stopped broadcast.", t)
+        }
         // Post-fire handoff, exactly once per completed ring: the identity
         // was cleared above, so duplicate stop calls find wasRinging false.
         // Legacy test rings carry no schedule token and stay silent.
-        if (wasRinging && stoppedTriggerAtMillis != null) {
+        if (stoppedTriggerAtMillis != null) {
             MainActivity.notifyAlarmStopped(stoppedAlarmId, stoppedTriggerAtMillis)
         }
     }
