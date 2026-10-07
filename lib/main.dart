@@ -1,6 +1,7 @@
 // TEMPORARY: manual native pipeline test screen. Will be replaced by the real home screen later.
 import 'package:alarmx/core/alarms/native_alarm_events.dart';
 import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
+import 'package:alarmx/core/bootstrap/app_bootstrap.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
@@ -9,7 +10,19 @@ import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
-void main() {
+/// Production entry point: reconciles stored alarms with the OS first
+/// (core reliability infrastructure, not UI), then shows the app.
+///
+/// Reconciliation failure never blocks launch: the app still starts and a
+/// later lifecycle event retries. Widget tests pump [MyApp] directly and
+/// never call this, so their isolation is unaffected.
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await runProductionReconciliation();
+  } catch (e) {
+    debugPrint('App-start reconciliation failed: $e');
+  }
   runApp(const MyApp());
 }
 

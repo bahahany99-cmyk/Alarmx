@@ -1,31 +1,28 @@
-// Headless entry point for BOOT_COMPLETED schedule reconciliation.
+// Headless entry point for system lifecycle schedule reconciliation.
 //
-// `BootReceiver` (native, no UI, no activity) spins up a short-lived
-// headless FlutterEngine and executes [reconcileAfterBoot], which opens the
-// same Drift database file the UI uses, runs the existing coordinator
-// reconciliation, and reports completion back over the shared scheduler
-// channel (`onReconcileComplete`). Native destroys the engine afterwards.
+// `BootReceiver` / `AlarmLifecycleReceiver` (native, no UI, no activity)
+// spin up a short-lived headless FlutterEngine and execute
+// [reconcileAfterBoot], which runs the shared production bootstrap and
+// reports completion back over the scheduler channel
+// (`onReconcileComplete`). Native destroys the engine afterwards.
 //
 // Scheduling truth stays in Dart: this file contains no recurrence math —
-// it only wires database + coordinator + the existing channel scheduler,
-// reusing the exact objects the UI path uses. In release builds the
-// function survives tree-shaking via `vm:entry-point`; its name must match
-// `BootReceiver`'s `DART_ENTRYPOINT`.
+// the bootstrap reuses the exact database/coordinator/scheduler objects the
+// UI path uses. In release builds the function survives tree-shaking via
+// `vm:entry-point`; its name must match `HeadlessReconcileRunner`'s
+// `DART_ENTRYPOINT`.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import '../alarms/native_alarm_scheduler_impl.dart';
-import '../database/database.dart';
-import '../repositories/alarm_repository.dart';
+import '../bootstrap/app_bootstrap.dart';
 import 'alarm_schedule_result.dart';
-import 'alarm_scheduling_coordinator.dart';
 
 /// Shared scheduler channel (must match `AlarmSchedulerChannelHandler`).
 const MethodChannel _reconcileChannel =
     MethodChannel('com.alarmx.app.alarmx/alarm_scheduler');
 
-/// Reconciles stored alarms with the OS after boot; see the file docs.
+/// Reconciles stored alarms with the OS from a headless engine.
 ///
 /// Always attempts the `onReconcileComplete` handshake, even on failure, so
 /// native can release the engine. `ok` is true when the pass completed
@@ -36,23 +33,9 @@ Future<void> reconcileAfterBoot() async {
   WidgetsFlutterBinding.ensureInitialized();
   final Map<String, Object?> payload = <String, Object?>{'ok': false};
   try {
-    final AppDatabase db = AppDatabase();
-    try {
-      final AlarmSchedulingCoordinator coordinator = AlarmSchedulingCoordinator(
-        repository: DriftAlarmRepository(db.alarmDao),
-        scheduler: const NativeAlarmSchedulerImpl(),
-      );
-      final ReconciliationReport report =
-          await coordinator.reconcileSchedules();
-      payload['ok'] = true;
-      payload.addAll(report.toMap());
-    } finally {
-      try {
-        await db.close();
-      } catch (_) {
-        // Cleanup failure must not mask a completed pass.
-      }
-    }
+    final ReconciliationReport report = await runProductionReconciliation();
+    payload['ok'] = true;
+    payload.addAll(report.toMap());
   } catch (e) {
     payload['error'] = e.toString();
   }

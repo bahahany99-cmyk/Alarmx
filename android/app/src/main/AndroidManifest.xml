@@ -91,6 +91,26 @@
         </receiver>
 
         <!--
+          Phase 2.6 lifecycle reconciliation. Exported because every action
+          is delivered by the system (an outside sender); all actions are
+          system-originated, and the worst case of a spoofed delivery is one
+          extra idempotent reconcile pass. No permission is required to
+          receive these actions. Delegates to the shared headless runner;
+          BOOT_COMPLETED intentionally stays on BootReceiver above.
+        -->
+        <receiver
+            android:name=".AlarmLifecycleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
           Phase 1.2 ringing service started by AlarmReceiver. Not exported: only
           our own process starts/stops it. The mediaPlayback foreground type
           covers continuous alarm audio; the matching FOREGROUND_SERVICE and

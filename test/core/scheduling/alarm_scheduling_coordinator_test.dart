@@ -970,4 +970,329 @@ void main() {
       expect(scheduler.calls, isEmpty);
     });
   });
+
+  group('lifecycle recovery', () {
+    test('clock jump forward reschedules from the new time', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime friday = DateTime(2026, 10, 9, 10, 0);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: friday);
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 10, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('clock jump backward recomputes, not preserves', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: DateTime(2026, 10, 9, 10, 0));
+      expect(
+        scheduler.scheduledTriggers.single,
+        DateTime(2026, 10, 10, 7, 30),
+      );
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 8, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('one-time alarm caught by a forward jump stays completed', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 9, 10, 0),
+      );
+
+      expect(report.unschedulable, 1);
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('future alarm survives a forward jump unchanged', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: DateTime(2026, 10, 9, 10, 0));
+      final DateTime stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt!;
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 9, 10, 0),
+      );
+
+      expect(report.scheduled, 1);
+      expect(scheduler.scheduledTriggers.last, stored);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+    });
+
+    test('date change across midnight schedules the new day', () async {
+      final int id = await insertAlarm();
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 5, 23, 59),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 6, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('date change moves custom alarms to the next selected day', () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(
+          <Weekday>{Weekday.monday, Weekday.wednesday, Weekday.friday},
+        ),
+        repeatType: RepeatType.custom,
+      );
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 6, 12, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 7, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('date change keeps a same-day one-time alarm', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 7),
+      );
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 6, 10, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 7, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('date change clears disabled alarms with stale triggers', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      await alarms.setAlarmEnabled(id, false);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 6, 0, 1),
+      );
+
+      expect(report.disabledCleared, 1);
+      expect(scheduler.scheduledIds.length, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('daily alarm tracks wall time across a timezone shift', () async {
+      final int id = await insertAlarm();
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 5, 6, 0),
+      );
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        DateTime(2026, 10, 5, 7, 30),
+      );
+
+      // Wall clock now reads 08:00 in the new zone: the 07:30 definition
+      // moved to the next day, not by a fixed offset.
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 5, 8, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 6, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('custom alarm tracks wall time across a timezone shift', () async {
+      final int id = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(<Weekday>{Weekday.friday}),
+        repeatType: RepeatType.custom,
+      );
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 9, 6, 0),
+      );
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 9, 8, 0),
+      );
+
+      expect(report.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 16, 7, 30);
+      expect(scheduler.scheduledTriggers.last, expected);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('permission restoration schedules previously skipped alarms',
+        () async {
+      scheduler.canSchedule = false;
+      final int id = await insertAlarm();
+      final ReconciliationReport blocked =
+          await coordinator.reconcileSchedules(now: monday);
+      expect(blocked.permissionMissing, 1);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+
+      scheduler.canSchedule = true;
+      final ReconciliationReport restored =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(restored.permissionMissing, 0);
+      expect(restored.scheduled, 1);
+      final DateTime expected = DateTime(2026, 10, 6, 7, 30);
+      expect(scheduler.scheduledTriggers, <DateTime>[expected]);
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, expected);
+    });
+
+    test('package update restores the mixed set without resurrection',
+        () async {
+      final int daily = await insertAlarm();
+      final int custom = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(<Weekday>{Weekday.friday}),
+        repeatType: RepeatType.custom,
+      );
+      final int oncePast = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      final int off = await insertAlarm();
+      await coordinator.scheduleAlarm(daily, now: monday);
+      await coordinator.scheduleAlarm(off, now: monday);
+      await alarms.setAlarmEnabled(off, false);
+      final DateTime ref = DateTime(2026, 10, 8, 10, 0);
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: ref);
+
+      expect(report.processed, 4);
+      expect(report.scheduled, 2);
+      expect(report.unschedulable, 1);
+      expect(report.disabledCleared, 1);
+      expect(report.failed, 0);
+      expect(
+        (await alarms.getAlarmById(daily))!.nextTriggerAt,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(custom))!.nextTriggerAt,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+      expect((await alarms.getAlarmById(oncePast))!.nextTriggerAt, isNull);
+      expect((await alarms.getAlarmById(off))!.nextTriggerAt, isNull);
+      expect(
+        scheduler.scheduledIds.where((int id) => id == daily),
+        hasLength(2),
+      );
+    });
+
+    test('advancing reconciles chain forward with no duplicates', () async {
+      final int id = await insertAlarm();
+      await coordinator.reconcileSchedules(now: monday);
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 6, 10, 0),
+      );
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(scheduler.scheduledTriggers, <DateTime>[
+        DateTime(2026, 10, 6, 7, 30),
+        DateTime(2026, 10, 7, 7, 30),
+        DateTime(2026, 10, 8, 7, 30),
+      ]);
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+    });
+
+    test('unknown tokens rejected, valid token chains after reconcile',
+        () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+      final DateTime stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt!;
+      expect(stored, DateTime(2026, 10, 8, 7, 30));
+
+      final AlarmScheduleResult rejected =
+          await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: DateTime(2026, 10, 9, 7, 30),
+      );
+      expect(rejected, isA<AlarmNotSchedulable>());
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+
+      final AlarmScheduleResult chained =
+          await coordinator.rescheduleAfterFire(
+        alarmId: id,
+        firedTriggerAt: stored,
+      );
+      final AlarmScheduled scheduled = chained as AlarmScheduled;
+      expect(scheduled.triggerAt, DateTime(2026, 10, 9, 7, 30));
+      expect(
+        (await alarms.getAlarmById(id))!.nextTriggerAt,
+        scheduled.triggerAt,
+      );
+    });
+
+    test('mixed set under a backward jump recomputes every alarm', () async {
+      final int daily = await insertAlarm();
+      final int custom = await insertAlarm(
+        repeatDays: RepeatDays.fromDays(
+          <Weekday>{Weekday.monday, Weekday.wednesday, Weekday.friday},
+        ),
+        repeatType: RepeatType.custom,
+      );
+      final int once = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 8),
+      );
+      final int off = await insertAlarm(label: 'Off');
+      await coordinator.scheduleAlarm(daily, now: DateTime(2026, 10, 9, 10, 0));
+      await coordinator.scheduleAlarm(off, now: DateTime(2026, 10, 9, 10, 0));
+      await alarms.setAlarmEnabled(off, false);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.processed, 4);
+      expect(report.scheduled, 3);
+      expect(report.disabledCleared, 1);
+      expect(report.failed, 0);
+      expect(
+        (await alarms.getAlarmById(daily))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(custom))!.nextTriggerAt,
+        DateTime(2026, 10, 9, 7, 30),
+      );
+      expect(
+        (await alarms.getAlarmById(once))!.nextTriggerAt,
+        DateTime(2026, 10, 8, 7, 30),
+      );
+      expect((await alarms.getAlarmById(off))!.nextTriggerAt, isNull);
+    });
+  });
 }
