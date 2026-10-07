@@ -45,8 +45,9 @@ jobs:
           timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
           code=${code:-0}
           echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
-          python3 - <<'PY' 2>&1 | tee /tmp/test.log
+          CODE=$code python3 - <<'PY' 2>&1 | tee /tmp/test.log
           import json
+          import os
           starts, dones, errors = {}, 0, []
           try:
               lines = open('/tmp/json.log', errors='replace').read().splitlines()
@@ -77,6 +78,25 @@ jobs:
           print(f'errored tests: {len(errors)}')
           for name in errors[:15]:
               print(f'  ERROR: {name}')
+          print(f"wall-bound exit: {os.environ.get('CODE')} (124 = killed at 150s)")
+          print('--- first error details ---')
+          shown = 0
+          for line in lines:
+              if shown >= 2:
+                  break
+              line = line.strip()
+              if not line.startswith('{'):
+                  continue
+              try:
+                  e = json.loads(line)
+              except ValueError:
+                  continue
+              if e.get('type') != 'error':
+                  continue
+              shown += 1
+              print(f"  ERR #{shown}: {str(e.get('error', ''))[:500]}")
+              for fl in str(e.get('stackTrace', '')).splitlines()[:8]:
+                  print(f"    {fl[:160]}")
           PY
           test "$code" -eq 0
       # Workflow logs are not always reachable from every environment, so mirror
