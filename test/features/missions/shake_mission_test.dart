@@ -204,6 +204,7 @@ void main() {
         (WidgetTester tester) async {
       final FakeShakeSource source = FakeShakeSource();
       addTearDown(source.close);
+      final FakeClock clock = FakeClock(DateTime(2026, 1, 1));
       int completions = 0;
       await pumpShake(
         tester,
@@ -212,15 +213,18 @@ void main() {
         onCompleted: () {
           completions++;
         },
+        detector: ShakeDetector(clock: clock.call),
       );
       source.emit(20);
       await pumpSettle(tester);
       expect(find.text('1 / 2'), findsOneWidget);
       expect(completions, 0);
-      // A second sample within the 500ms debounce must not count: the
-      // fake-async pumps above advanced fake time, so advance it past the
-      // debounce explicitly for the completing shake.
-      await tester.pump(const Duration(milliseconds: 600));
+      // A rapid second sample is debounced and must not count ...
+      source.emit(20);
+      await pumpSettle(tester);
+      expect(find.text('1 / 2'), findsOneWidget);
+      // ... while a shake past the debounce completes the mission.
+      clock.advance(const Duration(milliseconds: 600));
       source.emit(20);
       await pumpSettle(tester);
       expect(find.text(en.missionCompleted), findsOneWidget);
