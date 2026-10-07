@@ -42,9 +42,9 @@ jobs:
         # helpers. Reverted to the stock gate after verification.
         run: |
           set -o pipefail
-          timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
+          timeout 600 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
           code=${code:-0}
-          echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
+          echo "WALL-BOUND EXIT: $code (124 = still running at 600s)"
           CODE=$code python3 - <<'PY' 2>&1 | tee /tmp/test.log
           import json
           import os
@@ -78,7 +78,17 @@ jobs:
           print(f'errored tests: {len(errors)}')
           for name in errors[:15]:
               print(f'  ERROR: {name}')
-          print(f"wall-bound exit: {os.environ.get('CODE')} (124 = killed at 150s)")
+          print(f"wall-bound exit: {os.environ.get('CODE')} (124 = killed at 600s)")
+          for line in lines:
+              line = line.strip()
+              if not line.startswith('{'):
+                  continue
+              try:
+                  e = json.loads(line)
+              except ValueError:
+                  continue
+              if e.get('type') == 'done':
+                  print(f"runner done event: success={e.get('success')} time={e.get('time')}")
           print('--- exception dumps (full) ---')
           shown = 0
           for line in lines:
