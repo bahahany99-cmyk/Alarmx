@@ -41,6 +41,10 @@ class AlarmListTile extends StatelessWidget {
         alarm.enabled ? strings.onLabel : strings.offLabel;
     final ThemeData theme = Theme.of(context);
 
+    // Custom row instead of ListTile: ListTile fixes its height (56/72/88)
+    // by line count, but the title plus 2-3 subtitle lines exceed those
+    // heights under taller font metrics and overflow. This layout sizes to
+    // content in both axes, so it fits under any font metrics.
     return Opacity(
       opacity: alarm.enabled ? 1.0 : 0.55,
       child: Card(
@@ -51,61 +55,60 @@ class AlarmListTile extends StatelessWidget {
           top: 6,
           bottom: 6,
         ),
-        child: ListTile(
+        child: InkWell(
           onTap: onTap,
-          contentPadding: const EdgeInsetsDirectional.only(
-            start: 16,
-            end: 8,
-            top: 8,
-            bottom: 8,
-          ),
-          title: Text(
-            timeText,
-            style: theme.textTheme.headlineMedium,
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsetsDirectional.only(top: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(
+              start: 16,
+              end: 8,
+              top: 8,
+              bottom: 8,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                if (label != null)
-                  Text(label, style: theme.textTheme.titleMedium),
-                Text(describeRepeat(context, alarm)),
-                Text(describeNextTrigger(context, alarm)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        timeText,
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      if (label != null)
+                        Text(label, style: theme.textTheme.titleMedium),
+                      Text(describeRepeat(context, alarm)),
+                      Text(describeNextTrigger(context, alarm)),
+                    ],
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Semantics(
+                      label: label == null
+                          ? '$timeText, $stateText'
+                          : '$timeText, $label, $stateText',
+                      child: Switch(
+                        key: Key('alarm_toggle_${alarm.id}'),
+                        value: alarm.enabled,
+                        onChanged: onToggle,
+                      ),
+                    ),
+                    Text(stateText, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+                IconButton(
+                  key: Key('alarm_delete_${alarm.id}'),
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: strings.delete,
+                  onPressed: onDelete,
+                ),
               ],
             ),
-          ),
-          // No isThreeLine: the subtitle holds 2-3 lines (label + repeat +
-          // next trigger) and must size to content. A fixed three-line
-          // height overflows by 8px under taller font metrics.
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Semantics(
-                    label: label == null
-                        ? '$timeText, $stateText'
-                        : '$timeText, $label, $stateText',
-                    child: Switch(
-                      key: Key('alarm_toggle_${alarm.id}'),
-                      value: alarm.enabled,
-                      onChanged: onToggle,
-                    ),
-                  ),
-                  Text(stateText, style: theme.textTheme.bodySmall),
-                ],
-              ),
-              IconButton(
-                key: Key('alarm_delete_${alarm.id}'),
-                icon: const Icon(Icons.delete_outline),
-                tooltip: strings.delete,
-                onPressed: onDelete,
-              ),
-            ],
           ),
         ),
       ),
