@@ -44,6 +44,14 @@ dependencies:
   flutter_riverpod: ^2.6.1
   intl: ^0.20.2
 
+  # Phase 4 mission hardware. Each package is used only while its mission
+  # executes; the camera permission is requested just-in-time at mission
+  # start, never at startup. One scanner package covers QR + barcode.
+  mobile_scanner: ^7.0.0
+  image_picker: ^1.0.0
+  sensors_plus: ^7.0.0
+  permission_handler: ^12.0.0
+
   # SDK-provided Material/Cupertino localizations (Arabic + RTL support for
   # system widgets such as the time/date pickers). No third-party package.
   flutter_localizations:

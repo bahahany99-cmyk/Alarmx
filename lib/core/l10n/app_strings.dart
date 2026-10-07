@@ -135,6 +135,70 @@ class AppStrings {
   String get msgNotSchedulable => text('msgNotSchedulable');
   String get msgScheduleFailed => text('msgScheduleFailed');
   String get msgValidationDays => text('msgValidationDays');
+  String get missionAdd => text('missionAdd');
+  String get missionEdit => text('missionEdit');
+  String get missionDeleteTitle => text('missionDeleteTitle');
+  String get missionDeleteMessage => text('missionDeleteMessage');
+  String get missionRequired => text('missionRequired');
+  String get missionOptional => text('missionOptional');
+  String get missionSkip => text('missionSkip');
+  String get missionMoveUp => text('missionMoveUp');
+  String get missionMoveDown => text('missionMoveDown');
+  String get missionPickType => text('missionPickType');
+  String get missionTyping => text('missionTyping');
+  String get missionPhoto => text('missionPhoto');
+  String get missionQr => text('missionQr');
+  String get missionBarcode => text('missionBarcode');
+  String get missionShake => text('missionShake');
+  String get missionMath => text('missionMath');
+  String get missionProgress => text('missionProgress');
+  String get missionCompleted => text('missionCompleted');
+  String get missionCorrect => text('missionCorrect');
+  String get missionIncorrect => text('missionIncorrect');
+  String get missionRetry => text('missionRetry');
+  String get missionCheck => text('missionCheck');
+  String get missionSolve => text('missionSolve');
+  String get missionDone => text('missionDone');
+  String get typingInstruction => text('typingInstruction');
+  String get typingHint => text('typingHint');
+  String get typingExpectedLabel => text('typingExpectedLabel');
+  String get photoInstruction => text('photoInstruction');
+  String get photoTake => text('photoTake');
+  String get photoLabel => text('photoLabel');
+  String get photoCancelled => text('photoCancelled');
+  String get qrInstruction => text('qrInstruction');
+  String get qrValueLabel => text('qrValueLabel');
+  String get barcodeInstruction => text('barcodeInstruction');
+  String get barcodeValueLabel => text('barcodeValueLabel');
+  String get scanCancel => text('scanCancel');
+  String get scanWrongCode => text('scanWrongCode');
+  String get shakeInstruction => text('shakeInstruction');
+  String get shakeCountLabel => text('shakeCountLabel');
+  String get mathInstruction => text('mathInstruction');
+  String get mathAnswerHint => text('mathAnswerHint');
+  String get mathCountLabel => text('mathCountLabel');
+  String get mathDifficultyLabel => text('mathDifficultyLabel');
+  String get mathEasy => text('mathEasy');
+  String get mathMedium => text('mathMedium');
+  String get mathHard => text('mathHard');
+  String get permissionCameraTitle => text('permissionCameraTitle');
+  String get permissionCameraMessage => text('permissionCameraMessage');
+  String get permissionAllow => text('permissionAllow');
+  String get permissionDenied => text('permissionDenied');
+  String get permissionOpenSettings => text('permissionOpenSettings');
+  String get permissionSensorMessage => text('permissionSensorMessage');
+  String get sensorUnavailable => text('sensorUnavailable');
+  String get ringingTitle => text('ringingTitle');
+  String get ringingNoMissions => text('ringingNoMissions');
+  String get ringingStop => text('ringingStop');
+  String get ringingLoadFailed => text('ringingLoadFailed');
+  String get ringingStopping => text('ringingStopping');
+  String get ringingStopFailed => text('ringingStopFailed');
+  String get ringingSkippedInvalid => text('ringingSkippedInvalid');
+  String get msgMissionInvalid => text('msgMissionInvalid');
+  String get msgMissionSaveFailed => text('msgMissionSaveFailed');
+  String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
+  String get missionFieldRequired => text('missionFieldRequired');
 
   static const Map<String, String> _ar = <String, String>{
     'appTitle': 'AlarmX',
@@ -174,7 +238,7 @@ class AppStrings {
     'snoozeCaption': 'الإعدادات فقط في هذه النسخة؛ تنفيذ الغفوة في مرحلة قادمة',
     'missionTitle': 'مهمة الإيقاف',
     'missionNone': 'بدون مهمة',
-    'missionCaption': 'المهام تصل في مرحلة قادمة',
+    'missionCaption': 'حل المهام لإيقاف المنبه',
     'save': 'حفظ',
     'cancel': 'إلغاء',
     'delete': 'حذف',
@@ -206,6 +270,70 @@ class AppStrings {
     'msgNotSchedulable': 'تم الحفظ، لكن لا يوجد موعد قادم لهذا المنبه',
     'msgScheduleFailed': 'تم الحفظ، لكن تعذّرت الجدولة',
     'msgValidationDays': 'اختر يومًا واحدًا على الأقل للتكرار المخصص',
+    'missionAdd': 'إضافة مهمة',
+    'missionEdit': 'تعديل المهمة',
+    'missionDeleteTitle': 'حذف المهمة؟',
+    'missionDeleteMessage': 'إزالة هذه المهمة من المنبه؟',
+    'missionRequired': 'مطلوبة',
+    'missionOptional': 'اختيارية',
+    'missionSkip': 'تخطي',
+    'missionMoveUp': 'نقل لأعلى',
+    'missionMoveDown': 'نقل لأسفل',
+    'missionPickType': 'اختر نوع المهمة',
+    'missionTyping': 'الكتابة',
+    'missionPhoto': 'الصورة',
+    'missionQr': 'QR',
+    'missionBarcode': 'الباركود',
+    'missionShake': 'الهز',
+    'missionMath': 'الرياضيات',
+    'missionProgress': 'المهمة',
+    'missionCompleted': 'مكتملة',
+    'missionCorrect': 'صحيح',
+    'missionIncorrect': 'غير صحيح، حاول مجددًا',
+    'missionRetry': 'حاول مجددًا',
+    'missionCheck': 'تحقق',
+    'missionSolve': 'حل',
+    'missionDone': 'تم',
+    'typingInstruction': 'اكتب النص التالي',
+    'typingHint': 'اكتب هنا',
+    'typingExpectedLabel': 'النص المطلوب كتابته',
+    'photoInstruction': 'التقط صورة لإيقاف المنبه',
+    'photoTake': 'التقط صورة',
+    'photoLabel': 'ماذا تصوّر؟ (اختياري)',
+    'photoCancelled': 'أُلغي التصوير — حاول مجددًا',
+    'qrInstruction': 'امسح رمز QR',
+    'qrValueLabel': 'قيمة رمز QR المتوقعة',
+    'barcodeInstruction': 'امسح الباركود',
+    'barcodeValueLabel': 'قيمة الباركود المتوقعة',
+    'scanCancel': 'إلغاء المسح',
+    'scanWrongCode': 'رمز غير صحيح — حاول مجددًا',
+    'shakeInstruction': 'هز هاتفك',
+    'shakeCountLabel': 'عدد الهزات المطلوبة',
+    'mathInstruction': 'حل لإيقاف المنبه',
+    'mathAnswerHint': 'الإجابة',
+    'mathCountLabel': 'عدد الأسئلة',
+    'mathDifficultyLabel': 'الصعوبة',
+    'mathEasy': 'سهلة',
+    'mathMedium': 'متوسطة',
+    'mathHard': 'صعبة',
+    'permissionCameraTitle': 'يلزم إذن الكاميرا',
+    'permissionCameraMessage': 'اسمح بالوصول إلى الكاميرا لإتمام هذه المهمة',
+    'permissionAllow': 'سماح',
+    'permissionDenied': 'تم رفض الإذن',
+    'permissionOpenSettings': 'فتح الإعدادات',
+    'permissionSensorMessage': 'يلزم حساس الحركة لإتمام هذه المهمة',
+    'sensorUnavailable': 'حساس الحركة غير متاح على هذا الجهاز',
+    'ringingTitle': 'المنبه يرن',
+    'ringingNoMissions': 'بدون مهام — أوقف المنبه',
+    'ringingStop': 'إيقاف المنبه',
+    'ringingLoadFailed': 'تعذّر تحميل المهام',
+    'ringingStopping': 'جارٍ الإيقاف…',
+    'ringingStopFailed': 'تعذّر الإيقاف — حاول مجددًا',
+    'ringingSkippedInvalid': 'تم تخطي بعض المهام (إعداد غير صالح)',
+    'msgMissionInvalid': 'إعداد المهمة غير مكتمل',
+    'msgMissionSaveFailed': 'تم الحفظ، لكن تعذّر حفظ المهام',
+    'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
+    'missionFieldRequired': 'هذا الحقل مطلوب',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -247,7 +375,7 @@ class AppStrings {
         'Settings only in this version; snooze behavior arrives in a later phase',
     'missionTitle': 'Stop mission',
     'missionNone': 'No mission selected',
-    'missionCaption': 'Missions arrive in a later phase',
+    'missionCaption': 'Solve missions to stop the alarm',
     'save': 'Save',
     'cancel': 'Cancel',
     'delete': 'Delete',
@@ -279,5 +407,69 @@ class AppStrings {
     'msgNotSchedulable': 'Saved, but this alarm has no upcoming occurrence',
     'msgScheduleFailed': 'Saved, but scheduling failed',
     'msgValidationDays': 'Select at least one day for custom repeat',
+    'missionAdd': 'Add mission',
+    'missionEdit': 'Edit mission',
+    'missionDeleteTitle': 'Delete mission?',
+    'missionDeleteMessage': 'Remove this mission from the alarm?',
+    'missionRequired': 'Required',
+    'missionOptional': 'Optional',
+    'missionSkip': 'Skip',
+    'missionMoveUp': 'Move up',
+    'missionMoveDown': 'Move down',
+    'missionPickType': 'Choose mission type',
+    'missionTyping': 'Typing',
+    'missionPhoto': 'Photo',
+    'missionQr': 'QR',
+    'missionBarcode': 'Barcode',
+    'missionShake': 'Shake',
+    'missionMath': 'Math',
+    'missionProgress': 'Mission',
+    'missionCompleted': 'Completed',
+    'missionCorrect': 'Correct',
+    'missionIncorrect': 'Incorrect, try again',
+    'missionRetry': 'Try again',
+    'missionCheck': 'Check',
+    'missionSolve': 'Solve',
+    'missionDone': 'Done',
+    'typingInstruction': 'Type the text below',
+    'typingHint': 'Type here',
+    'typingExpectedLabel': 'Text to type',
+    'photoInstruction': 'Take a photo to stop the alarm',
+    'photoTake': 'Take photo',
+    'photoLabel': 'What to photograph (optional)',
+    'photoCancelled': 'Photo cancelled — try again',
+    'qrInstruction': 'Scan the QR code',
+    'qrValueLabel': 'Expected QR value',
+    'barcodeInstruction': 'Scan the barcode',
+    'barcodeValueLabel': 'Expected barcode value',
+    'scanCancel': 'Cancel scan',
+    'scanWrongCode': 'Wrong code — try again',
+    'shakeInstruction': 'Shake your phone',
+    'shakeCountLabel': 'Required shakes',
+    'mathInstruction': 'Solve to stop the alarm',
+    'mathAnswerHint': 'Answer',
+    'mathCountLabel': 'Number of questions',
+    'mathDifficultyLabel': 'Difficulty',
+    'mathEasy': 'Easy',
+    'mathMedium': 'Medium',
+    'mathHard': 'Hard',
+    'permissionCameraTitle': 'Camera permission needed',
+    'permissionCameraMessage': 'Allow camera access to complete this mission',
+    'permissionAllow': 'Allow',
+    'permissionDenied': 'Permission denied',
+    'permissionOpenSettings': 'Open settings',
+    'permissionSensorMessage': 'Motion sensor access is needed for this mission',
+    'sensorUnavailable': 'Motion sensor is not available on this device',
+    'ringingTitle': 'Alarm ringing',
+    'ringingNoMissions': 'No missions — stop the alarm',
+    'ringingStop': 'Stop alarm',
+    'ringingLoadFailed': 'Could not load missions',
+    'ringingStopping': 'Stopping…',
+    'ringingStopFailed': 'Could not stop — try again',
+    'ringingSkippedInvalid': 'Some missions were skipped (invalid setup)',
+    'msgMissionInvalid': 'Mission setup is incomplete',
+    'msgMissionSaveFailed': 'Saved, but missions could not be saved',
+    'msgMissionsLoadFailed': 'Could not load missions',
+    'missionFieldRequired': 'This field is required',
   };
 }
