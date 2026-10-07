@@ -99,6 +99,11 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
   bool _finishing = false;
   bool _stopFailed = false;
 
+  /// True once the ring stopped and the host was notified. Renders a
+  /// static done state (not a spinner) so the tree settles while the host
+  /// navigates away.
+  bool _stopped = false;
+
   @override
   void initState() {
     super.initState();
@@ -142,7 +147,7 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
     if (!mounted || session == null) {
       return;
     }
-    if (session.isComplete && !_finishing && !_stopFailed) {
+    if (session.isComplete && !_finishing && !_stopFailed && !_stopped) {
       _finish();
     } else {
       setState(() {});
@@ -171,6 +176,13 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
       });
       return;
     }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _finishing = false;
+      _stopped = true;
+    });
     widget.onFinished();
   }
 
@@ -192,6 +204,18 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
   }
 
   Widget _body(AppStrings strings, String title) {
+    if (_stopped) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            strings.missionCompleted,
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
     if (_finishing) {
       return Center(
         child: Padding(
