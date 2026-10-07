@@ -50,4 +50,21 @@ class MissionDao extends DatabaseAccessor<AppDatabase> with _$MissionDaoMixin {
   Future<int> deleteMission(int id) {
     return (delete(missions)..where((t) => t.id.equals(id))).go();
   }
+
+  /// Atomically replaces every mission of [alarmId] with [entries].
+  ///
+  /// Runs inside a single transaction: either the whole list is replaced
+  /// or the stored list is untouched. An empty [entries] clears the
+  /// alarm's missions (a valid state: "no missions" needs no rows).
+  Future<void> replaceMissionsForAlarm(
+    int alarmId,
+    List<MissionsCompanion> entries,
+  ) {
+    return attachedDatabase.transaction(() async {
+      await (delete(missions)..where((t) => t.alarmId.equals(alarmId))).go();
+      for (final MissionsCompanion entry in entries) {
+        await into(missions).insert(entry);
+      }
+    });
+  }
 }

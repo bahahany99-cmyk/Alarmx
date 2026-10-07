@@ -31,6 +31,13 @@ abstract class MissionRepository {
 
   /// Deletes every mission attached to [alarmId]. Returns the removed count.
   Future<int> deleteMissionsForAlarm(int alarmId);
+
+  /// Atomically replaces the alarm's mission list with [entries].
+  /// An empty list clears the alarm's missions (a valid state).
+  Future<void> replaceMissionsForAlarm(
+    int alarmId,
+    List<MissionsCompanion> entries,
+  );
 }
 
 /// [MissionRepository] backed by Drift.
@@ -62,4 +69,11 @@ class DriftMissionRepository implements MissionRepository {
   @override
   Future<int> deleteMissionsForAlarm(int alarmId) =>
       _dao.deleteMissionsForAlarm(alarmId);
+
+  @override
+  Future<void> replaceMissionsForAlarm(
+    int alarmId,
+    List<MissionsCompanion> entries,
+  ) =>
+      _dao.replaceMissionsForAlarm(alarmId, entries);
 }
