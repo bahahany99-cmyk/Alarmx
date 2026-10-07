@@ -44,16 +44,18 @@ jobs:
           set -o pipefail
           run_probe() {
             # NOTE: GitHub runs steps with `bash -e`; the `||` keeps a
-            # failing probe from aborting the remaining probes.
+            # failing probe from aborting the remaining probes, and the
+            # failure is recorded for the final verdict instead.
             name="$1"; shift
             echo "=== PROBE $name START ==="
             code=0
-            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1 || code=$?
+            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1 || { code=$?; fail=1; }
             if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
-            tail -6 "/tmp/probe_$name.log"
+            tail -8 "/tmp/probe_$name.log"
             echo "=== PROBE $name END ==="
           }
           {
+            fail=0
             run_probe P0-old-pure test/core/models/ test/core/scheduling/next_occurrence_calculator_test.dart
             run_probe P1-old-drift test/core/database/ test/core/scheduling/alarm_scheduling_coordinator_test.dart test/core/bootstrap/
             run_probe P2-new-strings test/core/l10n/
@@ -64,7 +66,8 @@ jobs:
             run_probe P7-new-editor test/features/alarm_editor/alarm_editor_screen_test.dart
             run_probe P8-new-shell test/widget_test.dart
             run_probe P9-old-alarms test/core/alarms/
-            echo "ALL PROBES DONE"
+            echo "ALL PROBES DONE, failures=$fail"
+            test "$fail" -eq 0
           } 2>&1 | tee /tmp/test.log
 
       # Workflow logs are not always reachable from every environment, so mirror
