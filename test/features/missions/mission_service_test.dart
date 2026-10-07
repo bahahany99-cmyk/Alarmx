@@ -110,7 +110,7 @@ void main() {
 
     test('none rows are dropped silently, bad rows are counted', () async {
       final int alarmId = await insertAlarm();
-      final MissionDao dao = db.missionDao;
+      final dao = db.missionDao;
       await dao.insertMission(
         MissionsCompanion.insert(alarmId: alarmId, type: 'none'),
       );
