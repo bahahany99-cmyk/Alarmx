@@ -38,10 +38,28 @@ void main() {
     await pumpSettle(tester);
   }
 
+  /// Scrolls the editor form until [finder] matches a built widget.
+  ///
+  /// The form is a lazily-built list: deep rows (Strict, missions) do
+  /// not exist until they scroll near the viewport. Mirrors the
+  /// `ensureBuilt` helper of the editor widget tests.
+  Future<void> ensureBuilt(WidgetTester tester, Finder finder) async {
+    for (int i = 0; i < 12 && finder.evaluate().isEmpty; i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await pumpSettle(tester);
+    }
+  }
+
+  Future<void> scrollIntoView(WidgetTester tester, Finder finder) async {
+    await ensureBuilt(tester, finder);
+    await tester.ensureVisible(finder);
+    await pumpSettle(tester);
+  }
+
   Future<void> turnStrictOff(WidgetTester tester) async {
     final Finder strictSwitch =
         find.byKey(const Key('editor_strict_switch'));
-    await tester.ensureVisible(strictSwitch);
+    await scrollIntoView(tester, strictSwitch);
     await tester.tap(strictSwitch);
     await pumpSettle(tester);
   }
@@ -152,7 +170,7 @@ void main() {
 
       final Finder strictSwitch =
           find.byKey(const Key('editor_strict_switch'));
-      await tester.ensureVisible(strictSwitch);
+      await scrollIntoView(tester, strictSwitch);
       final SwitchListTile tile = tester.widget<SwitchListTile>(
         strictSwitch,
       );
@@ -241,6 +259,10 @@ void main() {
       final int id = await seedStrictAlarm(stack, const Duration(hours: 2));
       await pumpEditor(tester, stack, alarmId: id);
 
+      await scrollIntoView(
+        tester,
+        find.byKey(const Key('missions_unlock_button')),
+      );
       expect(find.text(en.missionLocked), findsOneWidget);
       expect(
         find.byKey(const Key('missions_unlock_button')),
@@ -260,6 +282,10 @@ void main() {
       await tester.tap(find.byKey(const Key('missions_unlock_button')));
       await pumpSettle(tester);
       await submitPin(tester, '1234');
+      await scrollIntoView(
+        tester,
+        find.byKey(const Key('mission_add_button')),
+      );
       expect(find.text(en.missionLocked), findsNothing);
       expect(
         find.byKey(const Key('mission_add_button')),
@@ -271,6 +297,10 @@ void main() {
     testWidgets('no lock without strict mode', (WidgetTester tester) async {
       final int plainId = await stack.insertAlarm(hour: 7, minute: 30);
       await pumpEditor(tester, stack, alarmId: plainId);
+      await scrollIntoView(
+        tester,
+        find.byKey(const Key('mission_add_button')),
+      );
       expect(find.text(en.missionLocked), findsNothing);
       expect(
         find.byKey(const Key('mission_add_button')),
@@ -283,6 +313,10 @@ void main() {
       final int strictId =
           await seedStrictAlarm(stack, const Duration(hours: 2));
       await pumpEditor(tester, stack, alarmId: strictId);
+      await scrollIntoView(
+        tester,
+        find.byKey(const Key('mission_add_button')),
+      );
       expect(find.text(en.missionLocked), findsNothing);
       expect(
         find.byKey(const Key('mission_add_button')),
