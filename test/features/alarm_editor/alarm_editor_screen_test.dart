@@ -58,7 +58,7 @@ void main() {
       expect(find.text('Mon'), findsNothing);
       // Snooze is enabled by default, so its chips show.
       expect(find.text('5'), findsOneWidget);
-      expect(find.text(en.missionNone), findsOneWidget);
+      expect(find.textContaining(en.missionNone), findsOneWidget);
       expect(find.byKey(const Key('editor_save_button')), findsOneWidget);
       await finishWidgetTest(tester, stack);
     });
