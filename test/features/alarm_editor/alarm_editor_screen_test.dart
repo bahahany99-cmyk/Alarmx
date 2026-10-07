@@ -42,11 +42,13 @@ void main() {
 
   group('create defaults', () {
     testWidgets('renders the default form', (WidgetTester tester) async {
+      // This test asserts top-to-bottom widgets in one pass, but the form
+      // is a lazily-built list taller than the 800x600 test viewport. Use
+      // a tall viewport so every row builds without scrolling.
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       await pumpEditor(tester, stack);
-      // The snooze chips sit below the fold in a lazily-built list; scroll
-      // so they build before asserting on them.
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
-      await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
       expect(find.textContaining('7:00'), findsOneWidget);
