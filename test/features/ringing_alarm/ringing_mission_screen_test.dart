@@ -149,7 +149,11 @@ Future<void> pumpRinging(
       localizationsDelegates: testDelegates,
       home: RingingMissionScreen(
         launch: RingingLaunch(alarmId: alarmId, label: 'Morning'),
+        alarms: stack.repository,
         missionService: missionService ?? stack.missions,
+        history: stack.history,
+        coordinator: stack.coordinator,
+        pinService: stack.pinService,
         bridge: bridge,
         onFinished: onFinished,
         overrides: overrides,
@@ -514,6 +518,7 @@ void main() {
         coordinator: stack.coordinator,
         settings: stack.settings,
         missionService: stack.missions,
+        history: stack.history,
         ringingBridge: bridge,
       ),
     );

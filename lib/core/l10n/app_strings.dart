@@ -222,6 +222,15 @@ class AppStrings {
   String get msgStrictBlackout => text('msgStrictBlackout');
   String get missionLocked => text('missionLocked');
   String get missionUnlock => text('missionUnlock');
+  String get ringingSnooze => text('ringingSnooze');
+  String get ringingSnoozesLeft => text('ringingSnoozesLeft');
+  String get ringingSnoozed => text('ringingSnoozed');
+  String get ringingEmergencyDone => text('ringingEmergencyDone');
+  String get ringingStrictLocked => text('ringingStrictLocked');
+  String get emergencyTitle => text('emergencyTitle');
+  String get emergencyHold => text('emergencyHold');
+  String get emergencyUsePin => text('emergencyUsePin');
+  String get emergencyCaption => text('emergencyCaption');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -382,6 +391,15 @@ class AppStrings {
     'msgStrictBlackout': 'الموعد قريب جدًا لإيقاف الوضع الصارم',
     'missionLocked': 'المهام مقفلة بالرقم السري',
     'missionUnlock': 'فتح بالرقم السري',
+    'ringingSnooze': 'غفوة',
+    'ringingSnoozesLeft': 'الغفوات المتبقية',
+    'ringingSnoozed': 'تمت الغفوة',
+    'ringingEmergencyDone': 'توقف الرنين',
+    'ringingStrictLocked': 'حلّ المهام المطلوبة للإيقاف',
+    'emergencyTitle': 'خروج طارئ',
+    'emergencyHold': 'اضغط مطولًا 10 ثوانٍ للإيقاف',
+    'emergencyUsePin': 'استخدام الرقم السري',
+    'emergencyCaption': 'يوقف هذا الرنين فقط — يبقى المنبه والوضع الصارم مفعّلين.',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -544,6 +562,15 @@ class AppStrings {
     'msgStrictBlackout': 'Too close to the next ring to switch Strict Mode off',
     'missionLocked': 'Missions are PIN-locked',
     'missionUnlock': 'Unlock with PIN',
+    'ringingSnooze': 'Snooze',
+    'ringingSnoozesLeft': 'Snoozes left',
+    'ringingSnoozed': 'Snoozed',
+    'ringingEmergencyDone': 'Ring stopped',
+    'ringingStrictLocked': 'Solve the required missions to stop',
+    'emergencyTitle': 'Emergency exit',
+    'emergencyHold': 'Hold 10 seconds to force-stop',
+    'emergencyUsePin': 'Use PIN instead',
+    'emergencyCaption': 'Stops this ring only — the alarm and Strict Mode stay on.',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };

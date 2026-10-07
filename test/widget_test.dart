@@ -42,6 +42,7 @@ void main() {
         coordinator: stack.coordinator,
         settings: stack.settings,
         missionService: stack.missions,
+        history: stack.history,
       ),
     );
     await pumpSettle(tester);

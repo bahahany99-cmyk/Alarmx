@@ -16,6 +16,7 @@ import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
 import 'package:alarmx/core/bootstrap/app_bootstrap.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
@@ -56,6 +57,7 @@ Future<void> main() async {
       ),
       settings: DriftAppSettingsRepository(db.appSettingsDao),
       missionService: MissionService(DriftMissionRepository(db.missionDao)),
+      history: DriftAlarmHistoryRepository(db.alarmHistoryDao),
       ringingBridge: MethodChannelRingingBridge(),
     ),
   );
@@ -73,6 +75,7 @@ class AlarmxApp extends StatefulWidget {
     required this.coordinator,
     required this.settings,
     required this.missionService,
+    required this.history,
     this.ringingBridge,
     this.events,
   });
@@ -81,6 +84,7 @@ class AlarmxApp extends StatefulWidget {
   final AlarmSchedulingCoordinator coordinator;
   final AppSettingsRepository settings;
   final MissionService missionService;
+  final AlarmHistoryRepository history;
 
   /// Ringing bridge override; `null` (tests, plain unit shells) boots Home.
   /// Production passes the MethodChannel bridge so ring launches route to
@@ -236,7 +240,11 @@ class _AlarmxAppState extends State<AlarmxApp> {
                     }
                     return RingingMissionScreen(
                       launch: launch,
+                      alarms: widget.repository,
                       missionService: widget.missionService,
+                      history: widget.history,
+                      coordinator: widget.coordinator,
+                      pinService: _pinService,
                       bridge: bridge,
                       onFinished: () {
                         if (mounted) {
