@@ -76,7 +76,9 @@ class AlarmListTile extends StatelessWidget {
               ],
             ),
           ),
-          isThreeLine: true,
+          // No isThreeLine: the subtitle holds 2-3 lines (label + repeat +
+          // next trigger) and must size to content. A fixed three-line
+          // height overflows by 8px under taller font metrics.
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
