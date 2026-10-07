@@ -128,6 +128,9 @@ class PinService {
     if (!await verifyPin(current)) {
       return 'msgPinIncorrect';
     }
+    // Ensure the singleton row exists: updateSettings writes nothing on
+    // an empty table, and a PIN write may precede any settings read.
+    await _settings.getSettings();
     await _settings.updateSettings(
       const AppSettingsCompanion(
         pinEnabled: Value<bool>(false),
@@ -142,6 +145,8 @@ class PinService {
     final List<int> hash = _stretch(pin, salt, kPinHashIterations);
     final String encoded = 'v1\$$kPinHashIterations\$'
         '${_encode(salt)}\$${_encode(hash)}';
+    // Ensure the singleton row exists (see disablePin).
+    await _settings.getSettings();
     await _settings.updateSettings(
       AppSettingsCompanion(
         pinEnabled: const Value<bool>(true),

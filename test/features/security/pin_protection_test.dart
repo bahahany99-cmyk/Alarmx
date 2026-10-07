@@ -142,6 +142,7 @@ void main() {
   group('editor strict toggle', () {
     testWidgets('create mode defaults strict from settings',
         (WidgetTester tester) async {
+      await stack.settings.getSettings();
       await stack.settings.updateSettings(
         const AppSettingsCompanion(
           strictModeDefault: Value<bool>(true),

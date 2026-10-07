@@ -173,6 +173,7 @@ void main() {
 
   group('corrupt storage', () {
     test('garbage hash reads as disabled and never verifies', () async {
+      await stack.settings.getSettings();
       await stack.settings.updateSettings(
         const AppSettingsCompanion(
           pinEnabled: Value<bool>(true),
@@ -185,6 +186,7 @@ void main() {
     });
 
     test('unknown version and absurd iterations fail closed', () async {
+      await stack.settings.getSettings();
       final PinService pin = fixedSaltService(stack);
       for (final String bad in <String>[
         'v2\$100000\$xx\$yy',
