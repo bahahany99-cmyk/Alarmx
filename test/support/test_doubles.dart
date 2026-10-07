@@ -23,7 +23,7 @@ import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/home/home_screen.dart';
 import 'package:alarmx/main.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -83,6 +83,9 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
 /// Real in-memory engine stack for tests.
 class TestStack {
   TestStack() {
+    // Each widget test intentionally leaves its stack open (see the note in
+    // the widget-test files); silence drift's concurrent-database warning.
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
     db = AppDatabase.connect(NativeDatabase.memory());
     repository = DriftAlarmRepository(db.alarmDao);
     settings = DriftAppSettingsRepository(db.appSettingsDao);
@@ -178,6 +181,14 @@ Future<void> pumpAlarmxApp(
   TestStack stack, {
   String language = AppLanguage.english,
 }) async {
+  // Self-cleaning: unmount the tree while pumps are still legal, then
+  // elapse fake time so drift's deferred stream-cache timer (scheduled on
+  // every watch unsubscribe) fires before the postTest pending-timer check.
+  // Test-scoped tearDowns run before the postTest disposal and checks.
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox());
+    await pumpSettle(tester);
+  });
   await stack.setLanguage(language);
   await tester.pumpWidget(
     AlarmxApp(
@@ -196,6 +207,14 @@ Future<void> pumpHome(
   String language = AppLanguage.english,
   ValueChanged<String>? onLanguageChanged,
 }) async {
+  // Self-cleaning: unmount the tree while pumps are still legal, then
+  // elapse fake time so drift's deferred stream-cache timer (scheduled on
+  // every watch unsubscribe) fires before the postTest pending-timer check.
+  // Test-scoped tearDowns run before the postTest disposal and checks.
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox());
+    await pumpSettle(tester);
+  });
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),

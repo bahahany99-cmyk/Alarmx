@@ -93,20 +93,14 @@ void main() {
   group('create save', () {
     testWidgets('daily alarm with label is saved and scheduled',
         (WidgetTester tester) async {
-      debugPrint('PHASE daily-label: body start');
       await pumpEditor(tester, stack);
-      debugPrint('PHASE daily-label: pumped');
       await tester.enterText(
         find.byKey(const Key('editor_label_field')),
         'Work',
       );
-      debugPrint('PHASE daily-label: text entered');
       await tester.pump();
-      debugPrint('PHASE daily-label: tapping save');
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      debugPrint('PHASE daily-label: save tapped, settling');
       await pumpSettle(tester);
-      debugPrint('PHASE daily-label: settled');
 
       // Popped back.
       expect(find.byKey(const Key('editor_save_button')), findsNothing);
@@ -117,7 +111,6 @@ void main() {
       expect(rows.single.repeatType, 'daily');
       expect(rows.single.nextTriggerAt, isNotNull);
       expect(stack.scheduler.scheduledIds, <int>[rows.single.id]);
-      debugPrint('PHASE daily-label: body end');
     });
 
     testWidgets('custom days are stored as the typed bitmask',

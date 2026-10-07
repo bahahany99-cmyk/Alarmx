@@ -37,9 +37,9 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        # TEMP DIAGNOSTIC (Phase 3 hang hunt, round 3): JSON reporter +
-        # 150s wall bound. Captures PHASE prints from the wedging test to
-        # pin the stuck phase. Reverted after diagnosis.
+        # TEMP DIAGNOSTIC (Phase 3 hang hunt, verification): JSON reporter +
+        # 150s wall bound. Expecting exit 0 after the self-cleaning pump
+        # helpers. Reverted to the stock gate after verification.
         run: |
           set -o pipefail
           timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
@@ -47,7 +47,7 @@ jobs:
           echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
           python3 - <<'PY' 2>&1 | tee /tmp/test.log
           import json
-          starts, dones, phases = {}, 0, []
+          starts, dones, errors = {}, 0, []
           try:
               lines = open('/tmp/json.log', errors='replace').read().splitlines()
           except OSError:
@@ -56,8 +56,6 @@ jobs:
           for line in lines:
               line = line.strip()
               if not line.startswith('{'):
-                  if 'PHASE daily-label' in line:
-                      phases.append(line[-120:])
                   continue
               try:
                   e = json.loads(line)
@@ -69,46 +67,16 @@ jobs:
                   starts[test.get('id')] = (test.get('name'), test.get('url', ''))
               elif t == 'testDone':
                   dones += 1
+                  if e.get('result') == 'error':
+                      errors.append(starts.get(e.get('testID'), ('?', ''))[0])
                   starts.pop(e.get('testID'), None)
-              elif t == 'print':
-                  msg = str(e.get('message', ''))
-                  if 'PHASE daily-label' in msg:
-                      phases.append(msg.strip()[-120:])
           print(f'tests done: {dones}')
           print(f'tests started-but-unfinished: {len(starts)}')
           for tid, (name, url) in list(starts.items())[:15]:
               print(f'  UNFINISHED: {name}')
-          print(f'phase prints captured: {len(phases)}')
-          for ph in phases[-12:]:
-              print(f'  PHASE: {ph}')
-          print('--- raw head (first 30) ---')
-          for line in lines[:30]:
-              print(f'  RAW: {line[:200]}')
-          print('--- raw tail (last 15) ---')
-          for line in lines[-15:]:
-              print(f'  RAW: {line[:200]}')
-          print('--- zero-timer creation stacks ---')
-          shown = 0
-          for line in lines:
-              line = line.strip()
-              if not line.startswith('{'):
-                  continue
-              try:
-                  e = json.loads(line)
-              except ValueError:
-                  continue
-              if e.get('type') != 'print':
-                  continue
-              msg = str(e.get('message', ''))
-              if 'FakeTimer' not in msg and 'Pending timers' not in msg:
-                  continue
-              if shown >= 3:
-                  break
-              if 'FakeTimer' in msg:
-                  shown += 1
-                  print(f'  STACK #{shown}:')
-                  for fl in msg.splitlines()[:14]:
-                      print(f'    {fl[:160]}')
+          print(f'errored tests: {len(errors)}')
+          for name in errors[:15]:
+              print(f'  ERROR: {name}')
           PY
           test "$code" -eq 0
       # Workflow logs are not always reachable from every environment, so mirror
