@@ -37,9 +37,13 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
+        # TEMP DIAGNOSTIC (Phase 3 hang hunt): bound every test to 30s and
+        # expand the reporter so a wedged test fails with its name in the
+        # log instead of stalling the suite. Reverted before the final
+        # Phase 3 report.
         run: |
           set -o pipefail
-          flutter test 2>&1 | tee /tmp/test.log
+          flutter test --timeout 30s -r expanded 2>&1 | tee /tmp/test.log
 
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
