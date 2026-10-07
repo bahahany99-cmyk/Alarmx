@@ -199,6 +199,7 @@ class AppStrings {
   String get ringingSkippedInvalid => text('ringingSkippedInvalid');
   String get msgMissionInvalid => text('msgMissionInvalid');
   String get msgMissionSaveFailed => text('msgMissionSaveFailed');
+  String get msgSnoozeFailed => text('msgSnoozeFailed');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -336,6 +337,7 @@ class AppStrings {
     'ringingSkippedInvalid': 'تم تخطي بعض المهام (إعداد غير صالح)',
     'msgMissionInvalid': 'إعداد المهمة غير مكتمل',
     'msgMissionSaveFailed': 'تم الحفظ، لكن تعذّر حفظ المهام',
+    'msgSnoozeFailed': 'تعذّرت الغفوة — حاول مجددًا',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -475,6 +477,7 @@ class AppStrings {
     'ringingSkippedInvalid': 'Some missions were skipped (invalid setup)',
     'msgMissionInvalid': 'Mission setup is incomplete',
     'msgMissionSaveFailed': 'Saved, but missions could not be saved',
+    'msgSnoozeFailed': 'Could not snooze — try again',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };
