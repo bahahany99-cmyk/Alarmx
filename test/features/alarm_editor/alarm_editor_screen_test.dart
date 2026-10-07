@@ -43,6 +43,10 @@ void main() {
   group('create defaults', () {
     testWidgets('renders the default form', (WidgetTester tester) async {
       await pumpEditor(tester, stack);
+      // The snooze chips sit below the fold in a lazily-built list; scroll
+      // so they build before asserting on them.
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
       expect(find.textContaining('7:00'), findsOneWidget);

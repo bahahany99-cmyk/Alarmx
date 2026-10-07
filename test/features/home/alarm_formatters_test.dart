@@ -121,7 +121,7 @@ void main() {
           ),
         ),
       );
-      expect(text, 'Oct 8, 2026');
+      expect(text, 'Thu, Oct 8');
     });
 
     testWidgets('dateless once falls back to the label',
@@ -197,7 +197,7 @@ void main() {
           _alarm(nextTriggerAt: DateTime(2026, 10, 6, 7, 30)),
         ),
       );
-      expect(_spaces(text), 'Next: Oct 6, 2026 7:30 AM');
+      expect(_spaces(text), 'Next: Tue, Oct 6 7:30 AM');
     });
 
     testWidgets('disabled or triggerless alarms show not-scheduled',

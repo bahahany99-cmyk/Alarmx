@@ -51,7 +51,7 @@ String formatAlarmTime(BuildContext context, int hour, int minute) {
 
 /// One-line repeat description for a stored alarm.
 ///
-///  - once: the stored date ("Oct 8, 2026"), or "Once" when dateless.
+///  - once: the stored date ("Thu, Oct 8" style), or "Once" when dateless.
 ///  - daily: "Daily" / "يومي".
 ///  - custom: the selected day names joined with the locale separator,
 ///    or the "no days" hint for an empty selection (unreachable through
