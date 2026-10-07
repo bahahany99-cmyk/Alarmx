@@ -8,7 +8,10 @@
 //     TEXT column: `v1$<iterations>$<base64url salt>$<base64url hash>`.
 //     The salt is 16 cryptographically random bytes ([Random.secure];
 //     never hard-coded); the hash is SHA-256 iterated
-//     [kPinHashIterations] times over `salt || utf8(pin)`.
+//     [kPinHashIterations] times over `salt || utf8(pin)`. The count is
+//     calibrated for sub-second unlock on-device (UX-bound): it raises
+//     brute-force cost but is not the security boundary — an attacker
+//     who can read the settings row can also flip `pinEnabled`.
 //   - Verification recomputes and compares in constant time. Unknown
 //     versions, malformed encodings, and absurd iteration counts fail
 //     closed (verify returns false, never throws).
@@ -40,7 +43,7 @@ const int kPinMaxLength = 12;
 const int kPinSaltLength = 16;
 
 /// SHA-256 iterations per hash/verification.
-const int kPinHashIterations = 100000;
+const int kPinHashIterations = 10000;
 
 /// PIN protection over `AppSettings`; see the file docs.
 class PinService {
