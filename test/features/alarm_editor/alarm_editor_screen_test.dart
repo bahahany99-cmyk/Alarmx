@@ -17,9 +17,12 @@ void main() {
     stack = TestStack();
   });
 
-  tearDown(() async {
-    await stack.close();
-  });
+  // NOTE: the stack is intentionally not closed. Group tearDown runs before
+  // postTest disposes the widget tree, so closing here shuts the Drift store
+  // while StreamBuilders still hold watch subscriptions; their later cancel
+  // then traps a zero-duration Timer (StreamQueryStore.markAsClosed) that is
+  // still pending at the postTest check and fails the test. Each test builds
+  // a fresh stack; the isolate exit reclaims the abandoned in-memory DB.
 
   Future<List<Alarm>> alarms() => stack.repository.getAlarms();
 
