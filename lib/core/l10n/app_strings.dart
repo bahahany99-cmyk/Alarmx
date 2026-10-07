@@ -200,6 +200,28 @@ class AppStrings {
   String get msgMissionInvalid => text('msgMissionInvalid');
   String get msgMissionSaveFailed => text('msgMissionSaveFailed');
   String get msgSnoozeFailed => text('msgSnoozeFailed');
+  String get securityTitle => text('securityTitle');
+  String get pinEnable => text('pinEnable');
+  String get pinDisable => text('pinDisable');
+  String get pinChange => text('pinChange');
+  String get pinStatusEnabled => text('pinStatusEnabled');
+  String get pinStatusDisabled => text('pinStatusDisabled');
+  String get pinCurrent => text('pinCurrent');
+  String get pinNew => text('pinNew');
+  String get pinConfirmNew => text('pinConfirmNew');
+  String get pinEnter => text('pinEnter');
+  String get pinUnlockTitle => text('pinUnlockTitle');
+  String get pinConfirm => text('pinConfirm');
+  String get msgPinMismatch => text('msgPinMismatch');
+  String get msgPinInvalid => text('msgPinInvalid');
+  String get msgPinIncorrect => text('msgPinIncorrect');
+  String get strictDefaultLabel => text('strictDefaultLabel');
+  String get strictDefaultCaption => text('strictDefaultCaption');
+  String get strictModeLabel => text('strictModeLabel');
+  String get strictModeCaption => text('strictModeCaption');
+  String get msgStrictBlackout => text('msgStrictBlackout');
+  String get missionLocked => text('missionLocked');
+  String get missionUnlock => text('missionUnlock');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -338,6 +360,28 @@ class AppStrings {
     'msgMissionInvalid': 'إعداد المهمة غير مكتمل',
     'msgMissionSaveFailed': 'تم الحفظ، لكن تعذّر حفظ المهام',
     'msgSnoozeFailed': 'تعذّرت الغفوة — حاول مجددًا',
+    'securityTitle': 'الأمان',
+    'pinEnable': 'تفعيل الرقم السري',
+    'pinDisable': 'إيقاف الرقم السري',
+    'pinChange': 'تغيير الرقم السري',
+    'pinStatusEnabled': 'الرقم السري مفعّل',
+    'pinStatusDisabled': 'الرقم السري متوقف',
+    'pinCurrent': 'الرقم السري الحالي',
+    'pinNew': 'الرقم السري الجديد',
+    'pinConfirmNew': 'تأكيد الرقم السري الجديد',
+    'pinEnter': 'أدخل الرقم السري',
+    'pinUnlockTitle': 'أدخل الرقم السري للمتابعة',
+    'pinConfirm': 'تأكيد',
+    'msgPinMismatch': 'الرقم السري غير متطابق',
+    'msgPinInvalid': 'يجب أن يتكون الرقم السري من 4 إلى 12 رقمًا',
+    'msgPinIncorrect': 'الرقم السري غير صحيح',
+    'strictDefaultLabel': 'الوضع الصارم للمنبهات الجديدة',
+    'strictDefaultCaption': 'تفعيل الوضع الصارم تلقائيًا عند إنشاء منبه',
+    'strictModeLabel': 'الوضع الصارم',
+    'strictModeCaption': 'يجب حل المهام المطلوبة لإيقاف المنبه. لا يمنع هذا الإيقاف الإجباري أو مسح البيانات أو إطفاء الجهاز.',
+    'msgStrictBlackout': 'الموعد قريب جدًا لإيقاف الوضع الصارم',
+    'missionLocked': 'المهام مقفلة بالرقم السري',
+    'missionUnlock': 'فتح بالرقم السري',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -478,6 +522,28 @@ class AppStrings {
     'msgMissionInvalid': 'Mission setup is incomplete',
     'msgMissionSaveFailed': 'Saved, but missions could not be saved',
     'msgSnoozeFailed': 'Could not snooze — try again',
+    'securityTitle': 'Security',
+    'pinEnable': 'Enable PIN',
+    'pinDisable': 'Disable PIN',
+    'pinChange': 'Change PIN',
+    'pinStatusEnabled': 'PIN is on',
+    'pinStatusDisabled': 'PIN is off',
+    'pinCurrent': 'Current PIN',
+    'pinNew': 'New PIN',
+    'pinConfirmNew': 'Confirm new PIN',
+    'pinEnter': 'Enter PIN',
+    'pinUnlockTitle': 'Enter PIN to continue',
+    'pinConfirm': 'Confirm',
+    'msgPinMismatch': 'PINs do not match',
+    'msgPinInvalid': 'PIN must be 4–12 digits',
+    'msgPinIncorrect': 'Incorrect PIN',
+    'strictDefaultLabel': 'Strict Mode for new alarms',
+    'strictDefaultCaption': 'Turn Strict Mode on automatically for new alarms',
+    'strictModeLabel': 'Strict Mode',
+    'strictModeCaption': 'Required missions must be solved to stop. This does not prevent Force Stop, Clear Data, or Power Off.',
+    'msgStrictBlackout': 'Too close to the next ring to switch Strict Mode off',
+    'missionLocked': 'Missions are PIN-locked',
+    'missionUnlock': 'Unlock with PIN',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };

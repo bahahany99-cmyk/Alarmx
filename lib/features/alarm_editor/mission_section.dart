@@ -129,6 +129,8 @@ class MissionSectionCard extends StatelessWidget {
     required this.droppedInvalid,
     required this.onChanged,
     required this.onRetryLoad,
+    this.locked = false,
+    this.onUnlock,
   });
 
   /// Live draft list, mutated in place (add/edit/delete/reorder/toggle).
@@ -148,6 +150,13 @@ class MissionSectionCard extends StatelessWidget {
 
   /// Reloads stored missions after a load failure.
   final VoidCallback onRetryLoad;
+
+  /// PIN lock (Phase 5): when true the list is hidden behind an unlock
+  /// prompt because the alarm is strict and a PIN is enabled.
+  final bool locked;
+
+  /// PIN-unlock entry point; called by the unlock button when [locked].
+  final VoidCallback? onUnlock;
 
   Future<void> _add(BuildContext context) async {
     final MissionType? type = await showMissionTypePicker(context);
@@ -273,6 +282,26 @@ class MissionSectionCard extends StatelessWidget {
                     key: const Key('missions_retry_button'),
                     onPressed: onRetryLoad,
                     child: Text(strings.missionRetry),
+                  ),
+                ],
+              )
+            else if (locked)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const SizedBox(height: 8),
+                  const Icon(Icons.lock),
+                  const SizedBox(height: 8),
+                  Text(
+                    strings.missionLocked,
+                    style: theme.textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    key: const Key('missions_unlock_button'),
+                    onPressed: onUnlock,
+                    child: Text(strings.missionUnlock),
                   ),
                 ],
               )

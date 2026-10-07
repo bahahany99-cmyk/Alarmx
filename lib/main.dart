@@ -18,6 +18,7 @@ import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
@@ -98,6 +99,7 @@ class _AlarmxAppState extends State<AlarmxApp> {
     repository: widget.repository,
     coordinator: widget.coordinator,
   );
+  late final PinService _pinService = PinService(widget.settings);
   late final NativeAlarmEvents _events = widget.events ?? NativeAlarmEvents();
   late final Future<AppSetting> _settingsFuture =
       widget.settings.getSettings();
@@ -203,6 +205,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
               ? HomeScreen(
                   controller: _controller,
                   missionService: widget.missionService,
+                  pinService: _pinService,
+                  settings: widget.settings,
                   languageCode: languageCode,
                   onLanguageChanged: _setLanguage,
                 )
@@ -224,6 +228,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
                       return HomeScreen(
                         controller: _controller,
                         missionService: widget.missionService,
+                        pinService: _pinService,
+                        settings: widget.settings,
                         languageCode: languageCode,
                         onLanguageChanged: _setLanguage,
                       );

@@ -20,6 +20,7 @@ import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
@@ -93,6 +94,7 @@ class TestStack {
     repository = DriftAlarmRepository(db.alarmDao);
     settings = DriftAppSettingsRepository(db.appSettingsDao);
     missions = MissionService(DriftMissionRepository(db.missionDao));
+    pinService = PinService(settings);
     history = DriftAlarmHistoryRepository(db.alarmHistoryDao);
     scheduler = FakeNativeAlarmScheduler();
     coordinator = AlarmSchedulingCoordinator(
@@ -110,6 +112,7 @@ class TestStack {
   late final AlarmRepository repository;
   late final AppSettingsRepository settings;
   late final MissionService missions;
+  late final PinService pinService;
   late final AlarmHistoryRepository history;
   late final FakeNativeAlarmScheduler scheduler;
   late final AlarmSchedulingCoordinator coordinator;
@@ -231,6 +234,8 @@ Future<void> pumpHome(
       home: HomeScreen(
         controller: stack.controller,
         missionService: stack.missions,
+        pinService: stack.pinService,
+        settings: stack.settings,
         languageCode: language,
         onLanguageChanged: onLanguageChanged ?? (_) {},
       ),
@@ -259,10 +264,14 @@ Future<void> pumpEditor(
           ? AlarmEditorScreen.create(
               controller: stack.controller,
               missions: stack.missions,
+              pinService: stack.pinService,
+              settings: stack.settings,
             )
           : AlarmEditorScreen.edit(
               controller: stack.controller,
               missions: stack.missions,
+              pinService: stack.pinService,
+              settings: stack.settings,
               alarmId: alarmId,
             ),
     ),

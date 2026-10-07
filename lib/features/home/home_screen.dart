@@ -14,9 +14,13 @@
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/home/widgets/alarm_list_tile.dart';
+import 'package:alarmx/features/security/pin_prompt.dart';
+import 'package:alarmx/features/security/security_screen.dart';
 import 'package:flutter/material.dart';
 
 /// Home / alarm list; see the file docs.
@@ -25,6 +29,8 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.missionService,
+    required this.pinService,
+    required this.settings,
     required this.languageCode,
     required this.onLanguageChanged,
   });
@@ -34,6 +40,12 @@ class HomeScreen extends StatefulWidget {
 
   /// Validated mission-list operations for the alarm editor.
   final MissionService missionService;
+
+  /// PIN protection for strict-alarm deletes and the editor.
+  final PinService pinService;
+
+  /// Settings for the Security screen and the editor defaults.
+  final AppSettingsRepository settings;
 
   /// Active UI language code ('ar'/'en'), for the menu checkmark.
   final String languageCode;
@@ -55,6 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => AlarmEditorScreen.create(
           controller: widget.controller,
           missions: widget.missionService,
+          pinService: widget.pinService,
+          settings: widget.settings,
         ),
       ),
     );
@@ -70,6 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => AlarmEditorScreen.edit(
           controller: widget.controller,
           missions: widget.missionService,
+          pinService: widget.pinService,
+          settings: widget.settings,
           alarmId: alarm.id,
         ),
       ),
@@ -98,7 +114,55 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openSecurity() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityScreen(
+          settings: widget.settings,
+          pinService: widget.pinService,
+        ),
+      ),
+    );
+  }
+
   Future<void> _onDelete(Alarm alarm) async {
+    // Protected deletes: a strict alarm needs the PIN (when enabled)
+    // before even asking for confirmation; anything else deletes as
+    // before, with no extra friction.
+    if (alarm.strictMode) {
+      final bool pinOn;
+      try {
+        pinOn = await widget.pinService.isPinEnabled();
+      } catch (_) {
+        pinOn = false;
+      }
+      if (pinOn && mounted) {
+        final String? pin = await showPinPrompt(
+          context,
+          title: AppStrings.of(context).pinUnlockTitle,
+        );
+        if (pin == null || !mounted) {
+          return;
+        }
+        final bool ok;
+        try {
+          ok = await widget.pinService.verifyPin(pin);
+        } catch (_) {
+          ok = false;
+        }
+        if (!mounted) {
+          return;
+        }
+        if (!ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppStrings.of(context).msgPinIncorrect),
+            ),
+          );
+          return;
+        }
+      }
+    }
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -146,6 +210,12 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(strings.homeTitle),
         actions: <Widget>[
+          IconButton(
+            key: const Key('home_security_button'),
+            icon: const Icon(Icons.security),
+            tooltip: strings.securityTitle,
+            onPressed: _openSecurity,
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.language),
             tooltip: strings.languageMenu,

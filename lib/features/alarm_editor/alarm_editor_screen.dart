@@ -20,13 +20,17 @@
 
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
+import 'package:alarmx/core/alarms/strict_policy.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
 import 'package:alarmx/features/alarm_editor/mission_section.dart';
 import 'package:alarmx/features/home/alarm_formatters.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/security/pin_prompt.dart';
 import 'package:flutter/material.dart';
 
 /// Create (no [alarmId]) or edit form; see the file docs.
@@ -35,12 +39,16 @@ class AlarmEditorScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.missions,
+    required this.pinService,
+    required this.settings,
   }) : alarmId = null;
 
   const AlarmEditorScreen.edit({
     super.key,
     required this.controller,
     required this.missions,
+    required this.pinService,
+    required this.settings,
     required int this.alarmId,
   });
 
@@ -48,6 +56,12 @@ class AlarmEditorScreen extends StatefulWidget {
 
   /// Validated mission-list operations for the missions section.
   final MissionService missions;
+
+  /// PIN protection for strict changes and the mission lock.
+  final PinService pinService;
+
+  /// Settings source for the Strict default (create mode).
+  final AppSettingsRepository settings;
 
   /// Null for create, the stored id for edit.
   final int? alarmId;
@@ -78,6 +92,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         child: _EditorForm(
           controller: widget.controller,
           missions: widget.missions,
+          pinService: widget.pinService,
+          settings: widget.settings,
           existing: null,
         ),
       );
@@ -116,6 +132,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             key: ValueKey<int>(alarm.id),
             controller: widget.controller,
             missions: widget.missions,
+            pinService: widget.pinService,
+            settings: widget.settings,
             existing: alarm,
           ),
         );
@@ -148,11 +166,15 @@ class _EditorForm extends StatefulWidget {
     super.key,
     required this.controller,
     required this.missions,
+    required this.pinService,
+    required this.settings,
     required this.existing,
   });
 
   final AlarmController controller;
   final MissionService missions;
+  final PinService pinService;
+  final AppSettingsRepository settings;
   final Alarm? existing;
 
   @override
@@ -177,6 +199,13 @@ class _EditorFormState extends State<_EditorForm> {
   bool _missionsDroppedInvalid = false;
   Future<void>? _missionsLoad;
 
+  /// Effective PIN protection (flag on, parseable hash stored).
+  bool _pinEnabled = false;
+
+  /// Whether the PIN mission lock was unlocked this editor session.
+  bool _missionsUnlocked = false;
+  Future<void>? _protectionLoad;
+
   @override
   void initState() {
     super.initState();
@@ -185,6 +214,62 @@ class _EditorFormState extends State<_EditorForm> {
       _missionsLoading = true;
       _missionsLoad = _loadMissions(existing.id);
     }
+    _protectionLoad = _loadProtection();
+  }
+
+  /// Loads PIN protection plus (create mode) the Strict default. Never
+  /// throws: a settings read failure degrades to "unprotected" so the
+  /// editor never bricks on a storage fault (the failure itself is a
+  /// local read error, not an attack signal the UI can act on).
+  Future<void> _loadProtection() async {
+    final bool pinOn;
+    final bool strictDefault;
+    try {
+      pinOn = await widget.pinService.isPinEnabled();
+      strictDefault =
+          (await widget.settings.getSettings()).strictModeDefault;
+    } catch (_) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pinEnabled = pinOn;
+      if (widget.existing == null) {
+        _draft.strictMode = strictDefault;
+      }
+    });
+  }
+
+  /// PIN-unlocks the mission section for this editor session.
+  Future<void> _unlockMissions() async {
+    final AppStrings strings = AppStrings.of(context);
+    final String? pin = await showPinPrompt(
+      context,
+      title: strings.missionUnlock,
+    );
+    if (pin == null || !mounted) {
+      return;
+    }
+    final bool ok;
+    try {
+      ok = await widget.pinService.verifyPin(pin);
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.msgPinIncorrect)),
+      );
+      return;
+    }
+    setState(() {
+      _missionsUnlocked = true;
+    });
   }
 
   /// Loads stored missions into drafts. Unexecutable rows (malformed or
@@ -279,12 +364,60 @@ class _EditorFormState extends State<_EditorForm> {
 
   Future<void> _save() async {
     final AppStrings strings = AppStrings.of(context);
+    final Future<void>? pendingProtection = _protectionLoad;
+    if (pendingProtection != null) {
+      await pendingProtection;
+    }
+    if (!mounted) {
+      return;
+    }
     final String? invalidKey = _draft.validationMessageKey();
     if (invalidKey != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(strings.text(invalidKey))),
       );
       return;
+    }
+    // Strict-removal gates (Phase 5): the ring-proximity blackout first
+    // (no PIN prompt when the answer is already no), then PIN
+    // authentication when a PIN is enabled. Either failure keeps the
+    // editor open with the reason shown.
+    final bool wasStrict = widget.existing?.strictMode ?? false;
+    if (wasStrict && !_draft.strictMode) {
+      if (!StrictModePolicy.canDisableStrict(
+        wasStrict: true,
+        nextTriggerAt: widget.existing?.nextTriggerAt,
+        now: DateTime.now(),
+      )) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.msgStrictBlackout)),
+        );
+        return;
+      }
+      if (_pinEnabled) {
+        final String? pin = await showPinPrompt(
+          context,
+          title: strings.pinUnlockTitle,
+        );
+        if (!mounted || pin == null) {
+          return;
+        }
+        final bool ok;
+        try {
+          ok = await widget.pinService.verifyPin(pin);
+        } catch (_) {
+          ok = false;
+        }
+        if (!mounted) {
+          return;
+        }
+        if (!ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(strings.msgPinIncorrect)),
+          );
+          return;
+        }
+      }
     }
     setState(() {
       _saving = true;
@@ -456,6 +589,11 @@ class _EditorFormState extends State<_EditorForm> {
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 12),
+              _StrictCard(
+                draft: _draft,
+                onChanged: () => setState(() {}),
+              ),
+              const SizedBox(height: 12),
               MissionSectionCard(
                 drafts: _missionDrafts,
                 isLoading: _missionsLoading,
@@ -463,6 +601,10 @@ class _EditorFormState extends State<_EditorForm> {
                 droppedInvalid: _missionsDroppedInvalid,
                 onChanged: () => setState(() {}),
                 onRetryLoad: _retryMissionsLoad,
+                locked: _pinEnabled &&
+                    _draft.strictMode &&
+                    !_missionsUnlocked,
+                onUnlock: _unlockMissions,
               ),
             ],
           ),
@@ -782,6 +924,37 @@ class _TogglesCard extends StatelessWidget {
 }
 
 /// Snooze configuration (stored only; no execution in this phase).
+class _SnoozeCard extends StatelessWidget {
+/// Strict Mode toggle (Phase 5).
+///
+/// Flipping the switch only edits the draft; turning Strict off a
+/// stored strict alarm is gated at save time (ring-proximity blackout,
+/// then the PIN when enabled). The caption states the honest boundary:
+/// Strict gates dismissal inside the app, never the system.
+class _StrictCard extends StatelessWidget {
+  const _StrictCard({required this.draft, required this.onChanged});
+
+  final AlarmDraft draft;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppStrings strings = AppStrings.of(context);
+    return Card(
+      child: SwitchListTile(
+        key: const Key('editor_strict_switch'),
+        title: Text(strings.strictModeLabel),
+        subtitle: Text(strings.strictModeCaption),
+        value: draft.strictMode,
+        onChanged: (bool value) {
+          draft.strictMode = value;
+          onChanged();
+        },
+      ),
+    );
+  }
+}
+
 class _SnoozeCard extends StatelessWidget {
   const _SnoozeCard({required this.draft, required this.onChanged});
 

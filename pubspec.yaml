@@ -52,6 +52,10 @@ dependencies:
   sensors_plus: ^7.0.0
   permission_handler: ^12.0.0
 
+  # Phase 5 PIN protection: salted iterated SHA-256 verification. The only
+  # new dependency of the phase; nothing else in the tree hashes.
+  crypto: ^3.0.6
+
   # SDK-provided Material/Cupertino localizations (Arabic + RTL support for
   # system widgets such as the time/date pickers). No third-party package.
   flutter_localizations:
