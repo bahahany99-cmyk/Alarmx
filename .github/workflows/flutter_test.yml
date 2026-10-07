@@ -37,48 +37,15 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        # TEMP DIAGNOSTIC (Phase 3 hang hunt): JSON reporter + wall-clock
-        # bound. testStart events without matching testDone name the
-        # wedged tests; full completion at kill time proves a post-run
-        # harness stall instead. Reverted after diagnosis.
+        # NOTE: shards are capped at 2. The Phase 3 widget tests each pump a
+        # full MaterialApp over a real in-memory Drift stack; at 4-way
+        # parallelism the full suite wedges flakily mid-run (bisection
+        # proved every file green alone and in pairs — the stall needs the
+        # full parallel set). Two shards keep the run deterministic; every
+        # test still runs.
         run: |
           set -o pipefail
-          timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
-          code=${code:-0}
-          echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
-          python3 - <<'PY' 2>&1 | tee /tmp/test.log
-          import json
-          starts, dones = {}, 0
-          names = {}
-          try:
-              lines = open('/tmp/json.log', errors='replace').read().splitlines()
-          except OSError:
-              lines = []
-          print(f'json lines: {len(lines)}')
-          for line in lines:
-              line = line.strip()
-              if not line.startswith('{'):
-                  continue
-              try:
-                  e = json.loads(line)
-              except ValueError:
-                  continue
-              t = e.get('type')
-              if t == 'testStart':
-                  test = e.get('test', {})
-                  starts[test.get('id')] = test.get('name')
-              elif t == 'testDone':
-                  dones += 1
-                  starts.pop(e.get('testID'), None)
-          print(f'tests done: {dones}')
-          print(f'tests started-but-unfinished: {len(starts)}')
-          for tid, name in list(starts.items())[:15]:
-              print(f'  UNFINISHED: {name}')
-          print('--- raw tail ---')
-          for line in lines[-12:]:
-              print(line[:300])
-          PY
-          test "$code" -eq 0
+          flutter test --concurrency=2 2>&1 | tee /tmp/test.log
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
       - name: Surface logs on failure

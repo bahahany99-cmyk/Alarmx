@@ -97,6 +97,7 @@ void main() {
         find.byKey(const Key('editor_label_field')),
         'Work',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
@@ -185,6 +186,7 @@ void main() {
         find.byKey(const Key('editor_sound_uri_field')),
         'content://tones/x',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
@@ -328,6 +330,7 @@ void main() {
         find.byKey(const Key('editor_label_field')),
         'New',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
@@ -378,6 +381,7 @@ void main() {
         find.byKey(const Key('editor_label_field')),
         'Round',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
@@ -396,6 +400,7 @@ void main() {
         find.byKey(const Key('editor_label_field')),
         'After',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
