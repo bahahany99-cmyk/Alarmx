@@ -87,6 +87,28 @@ jobs:
           print('--- raw tail (last 15) ---')
           for line in lines[-15:]:
               print(f'  RAW: {line[:200]}')
+          print('--- zero-timer creation stacks ---')
+          shown = 0
+          for line in lines:
+              line = line.strip()
+              if not line.startswith('{'):
+                  continue
+              try:
+                  e = json.loads(line)
+              except ValueError:
+                  continue
+              if e.get('type') != 'print':
+                  continue
+              msg = str(e.get('message', ''))
+              if 'FakeTimer' not in msg and 'Pending timers' not in msg:
+                  continue
+              if shown >= 3:
+                  break
+              if 'FakeTimer' in msg:
+                  shown += 1
+                  print(f'  STACK #{shown}:')
+                  for fl in msg.splitlines()[:14]:
+                      print(f'    {fl[:160]}')
           PY
           test "$code" -eq 0
       # Workflow logs are not always reachable from every environment, so mirror
