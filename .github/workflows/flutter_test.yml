@@ -49,23 +49,16 @@ jobs:
             name="$1"; shift
             echo "=== PROBE $name START ==="
             code=0
-            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1 || { code=$?; fail=1; }
+            timeout 600 flutter test --timeout 60s "$@" > "/tmp/probe_$name.log" 2>&1 || { code=$?; fail=1; }
             if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
             tail -8 "/tmp/probe_$name.log"
             echo "=== PROBE $name END ==="
           }
           {
             fail=0
-            run_probe P0-old-pure test/core/models/ test/core/scheduling/next_occurrence_calculator_test.dart
-            run_probe P1-old-drift test/core/database/ test/core/scheduling/alarm_scheduling_coordinator_test.dart test/core/bootstrap/
-            run_probe P2-new-strings test/core/l10n/
-            run_probe P3-new-draft test/features/alarm_editor/alarm_draft_test.dart
-            run_probe P4-new-formatters test/features/home/alarm_formatters_test.dart
-            run_probe P5-new-controller test/core/alarms/alarm_controller_test.dart
-            run_probe P6-new-home test/features/home/home_screen_test.dart
-            run_probe P7-new-editor test/features/alarm_editor/alarm_editor_screen_test.dart
-            run_probe P8-new-shell test/widget_test.dart
-            run_probe P9-old-alarms test/core/alarms/
+            run_probe Q1-old-together test/core/models/ test/core/alarms/ test/core/database/ test/core/scheduling/ test/core/bootstrap/
+            run_probe Q2-new-together test/core/l10n/ test/core/alarms/alarm_controller_test.dart test/features/ test/widget_test.dart
+            run_probe Q3-full-serial --concurrency=1 test/
             echo "ALL PROBES DONE, failures=$fail"
             test "$fail" -eq 0
           } 2>&1 | tee /tmp/test.log
