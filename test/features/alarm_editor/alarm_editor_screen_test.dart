@@ -46,7 +46,12 @@ void main() {
   }
 
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    // ensureBuilt first (lazy rows may not exist yet), then ensureVisible
+    // (built-but-offscreen targets must scroll into the hit-testable
+    // viewport before the tap).
     await ensureBuilt(tester, finder);
+    await tester.ensureVisible(finder);
+    await pumpSettle(tester);
     await tester.tap(finder);
     await pumpSettle(tester);
   }
