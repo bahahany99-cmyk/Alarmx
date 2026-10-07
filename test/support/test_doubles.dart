@@ -155,10 +155,21 @@ const List<Locale> testLocales = <Locale>[
 
 /// Settles the pumped tree, failing fast instead of hanging.
 ///
-/// See the file docs for why the bound exists. Every Phase 3 widget test
-/// must use this instead of bare `pumpAndSettle()`.
-Future<void> pumpSettle(WidgetTester tester) {
-  return tester.pumpAndSettle(timeout: const Duration(seconds: 30));
+/// Same quiescence loop as `pumpAndSettle` (100ms pumps until no frame is
+/// scheduled), but bounded to 300 pumps: a tree that cannot settle in 30s
+/// of fake time is a wedged test and must fail with its name instead of
+/// burning the 10-minute default while CI looks hung. Every Phase 3
+/// widget test must use this instead of bare `pumpAndSettle()`.
+Future<void> pumpSettle(WidgetTester tester) async {
+  for (int i = 0; i < 300; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (!tester.binding.hasScheduledFrame) {
+      return;
+    }
+  }
+  throw StateError(
+    'pumpSettle: tree did not settle within 30s of fake time.',
+  );
 }
 
 /// Pumps the full production app shell in [language].
