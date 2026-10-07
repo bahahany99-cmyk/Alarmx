@@ -5,6 +5,11 @@
 // records calls. Widgets are therefore exercised against true persistence
 // and scheduling orchestration; only the OS bridge is faked. Nothing here
 // touches MethodChannels, files, or the clock beyond pinned values.
+//
+// Settling: every pump helper and test below uses [pumpSettle], which
+// bounds settling to 30s of fake time. A pump that cannot settle in that
+// window is a wedged test and must fail with its name instead of burning
+// `pumpAndSettle`'s 10-minute default while CI appears hung.
 
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/alarms/alarm_fire_config.dart';
@@ -148,6 +153,14 @@ const List<Locale> testLocales = <Locale>[
   Locale(AppLanguage.english),
 ];
 
+/// Settles the pumped tree, failing fast instead of hanging.
+///
+/// See the file docs for why the bound exists. Every Phase 3 widget test
+/// must use this instead of bare `pumpAndSettle()`.
+Future<void> pumpSettle(WidgetTester tester) {
+  return tester.pumpAndSettle(timeout: const Duration(seconds: 30));
+}
+
 /// Pumps the full production app shell in [language].
 Future<void> pumpAlarmxApp(
   WidgetTester tester,
@@ -162,7 +175,7 @@ Future<void> pumpAlarmxApp(
       settings: stack.settings,
     ),
   );
-  await tester.pumpAndSettle();
+  await pumpSettle(tester);
 }
 
 /// Pumps [HomeScreen] standalone in [language].
@@ -184,7 +197,7 @@ Future<void> pumpHome(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  await pumpSettle(tester);
 }
 
 /// Pumps [AlarmEditorScreen] standalone in [language].
@@ -211,5 +224,5 @@ Future<void> pumpEditor(
             ),
     ),
   );
-  await tester.pumpAndSettle();
+  await pumpSettle(tester);
 }

@@ -17,9 +17,11 @@ void main() {
     stack = TestStack();
   });
 
-  tearDown(() async {
-    await stack.close();
-  });
+  // NOTE: the stack is intentionally not closed. Widget tests leave live
+  // stream subscriptions behind (the tree disposes after tearDown),
+  // and closing the in-memory database underneath them races with
+  // stream delivery. Each test builds a fresh stack; the isolate exit
+  // reclaims the abandoned in-memory database.
 
   Future<List<Alarm>> alarms() => stack.repository.getAlarms();
 
@@ -32,9 +34,9 @@ void main() {
 
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
-    await tester.pumpAndSettle();
+    await pumpSettle(tester);
     await tester.tap(finder);
-    await tester.pumpAndSettle();
+    await pumpSettle(tester);
   }
 
   group('create defaults', () {
@@ -96,7 +98,7 @@ void main() {
         'Work',
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       // Popped back.
       expect(find.byKey(const Key('editor_save_button')), findsNothing);
@@ -116,7 +118,7 @@ void main() {
       await tapVisible(tester, find.text('Mon'));
       await tapVisible(tester, find.text('Wed'));
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final List<Alarm> rows = await alarms();
       expect(rows, hasLength(1));
@@ -149,7 +151,7 @@ void main() {
       );
       expect(find.text('Off'), findsOneWidget);
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final List<Alarm> rows = await alarms();
       expect(rows.single.enabled, isFalse);
@@ -167,7 +169,7 @@ void main() {
         ),
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect((await alarms()).single.vibrationEnabled, isFalse);
       expect(
@@ -184,7 +186,7 @@ void main() {
         'content://tones/x',
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final Alarm row = (await alarms()).single;
       expect(row.soundUri, 'content://tones/x');
@@ -207,11 +209,11 @@ void main() {
       await pumpEditor(tester, stack);
       final Finder slider = find.byType(Slider);
       await tester.ensureVisible(slider);
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.drag(slider, const Offset(-120, 0));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final int volume = (await alarms()).single.volume;
       expect(volume, lessThan(80));
@@ -227,7 +229,7 @@ void main() {
         ),
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect((await alarms()).single.fadeInEnabled, isTrue);
     });
@@ -241,7 +243,7 @@ void main() {
       );
       expect(find.text('5'), findsNothing);
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect((await alarms()).single.snoozeEnabled, isFalse);
     });
@@ -252,9 +254,9 @@ void main() {
       await tapVisible(tester, find.text('15'));
       await tapVisible(tester, find.byType(DropdownButton<int>));
       await tester.tap(find.text('5').last);
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final Alarm row = (await alarms()).single;
       expect(row.snoozeMinutes, 15);
@@ -266,7 +268,7 @@ void main() {
       await pumpEditor(tester, stack);
       expect(find.text(en.missionTitle), findsOneWidget);
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(await missionRowCount(), 0);
     });
@@ -277,11 +279,11 @@ void main() {
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
       await tester.tap(find.byKey(const Key('editor_time_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       expect(find.byType(TimePickerDialog), findsOneWidget);
 
       await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       expect(find.byType(TimePickerDialog), findsNothing);
       expect(find.textContaining('7:00'), findsOneWidget);
     });
@@ -291,11 +293,11 @@ void main() {
       await pumpEditor(tester, stack);
       await tapVisible(tester, find.text(en.repeatOnce));
       await tester.tap(find.byKey(const Key('editor_date_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       expect(find.byType(DatePickerDialog), findsOneWidget);
 
       await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       expect(find.byType(DatePickerDialog), findsNothing);
     });
   });
@@ -327,7 +329,7 @@ void main() {
         'New',
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final Alarm? stored = await stack.repository.getAlarmById(id);
       expect(stored?.label, 'New');
@@ -350,7 +352,7 @@ void main() {
         ),
       );
       await tester.tap(find.byKey(const Key('editor_save_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       final Alarm? stored = await stack.repository.getAlarmById(id);
       expect(stored?.enabled, isFalse);
@@ -371,7 +373,7 @@ void main() {
         (WidgetTester tester) async {
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(const Key('add_alarm_fab')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.enterText(
         find.byKey(const Key('editor_label_field')),
         'Round',
@@ -389,7 +391,7 @@ void main() {
       final int id = await stack.insertAlarm(label: 'Before');
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(Key('alarm_tile_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.enterText(
         find.byKey(const Key('editor_label_field')),
         'After',
@@ -407,9 +409,9 @@ void main() {
         (WidgetTester tester) async {
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(const Key('add_alarm_fab')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(await alarms(), isEmpty);
       expect(find.text(en.homeTitle), findsOneWidget);

@@ -16,9 +16,11 @@ void main() {
     stack = TestStack();
   });
 
-  tearDown(() async {
-    await stack.close();
-  });
+  // NOTE: the stack is intentionally not closed. Widget tests leave live
+  // stream subscriptions behind (the tree disposes after tearDown),
+  // and closing the in-memory database underneath them races with
+  // stream delivery. Each test builds a fresh stack; the isolate exit
+  // reclaims the abandoned in-memory database.
 
   group('list rendering', () {
     testWidgets('empty state offers adding an alarm',
@@ -78,7 +80,7 @@ void main() {
     testWidgets('FAB opens the create screen', (WidgetTester tester) async {
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(const Key('add_alarm_fab')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
     });
@@ -87,7 +89,7 @@ void main() {
         (WidgetTester tester) async {
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(const Key('empty_add_button')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
     });
@@ -97,7 +99,7 @@ void main() {
       final int id = await stack.insertAlarm(label: 'Work');
       await pumpHome(tester, stack);
       await tester.tap(find.byKey(Key('alarm_tile_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(find.text(en.editAlarmTitle), findsOneWidget);
       expect(find.text('Work'), findsOneWidget);
@@ -113,7 +115,7 @@ void main() {
       expect(find.text('On'), findsOneWidget);
 
       await tester.tap(find.byKey(Key('alarm_toggle_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(find.text('Off'), findsOneWidget);
       final Alarm? stored = await stack.repository.getAlarmById(id);
@@ -128,7 +130,7 @@ void main() {
       await pumpHome(tester, stack);
 
       await tester.tap(find.byKey(Key('alarm_toggle_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(find.text('On'), findsOneWidget);
       expect(stack.scheduler.scheduledIds, <int>[id]);
@@ -159,11 +161,11 @@ void main() {
       await pumpHome(tester, stack);
 
       await tester.tap(find.byKey(Key('alarm_delete_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       expect(find.text(en.deleteTitle), findsOneWidget);
 
       await tester.tap(find.text(en.cancel));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(await stack.repository.getAlarmById(id), isNotNull);
       expect(find.text('Work'), findsOneWidget);
@@ -176,9 +178,9 @@ void main() {
       await pumpHome(tester, stack);
 
       await tester.tap(find.byKey(Key('alarm_delete_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.text(en.delete));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(stack.scheduler.cancelledIds, contains(id));
       expect(await stack.repository.getAlarmById(id), isNull);
@@ -193,7 +195,7 @@ void main() {
       await pumpHome(tester, stack);
 
       await tester.tap(find.byKey(Key('alarm_delete_$id')));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.text(en.delete));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
@@ -214,9 +216,9 @@ void main() {
       );
 
       await tester.tap(find.byIcon(Icons.language));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
       await tester.tap(find.text('Arabic'));
-      await tester.pumpAndSettle();
+      await pumpSettle(tester);
 
       expect(selected, <String>['ar']);
     });

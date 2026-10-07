@@ -37,31 +37,15 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        # TEMP DIAGNOSTIC (Phase 3 hang hunt): bisect the suite file by
-        # file, each probe bounded by GNU timeout so a wedged file yields
-        # a TIMEOUT verdict instead of stalling. Reverted after diagnosis.
+        # NOTE: concurrency is capped at 2 shards. The Phase 3 widget tests
+        # each pump a full MaterialApp over a real in-memory Drift stack;
+        # at the default 4-way parallelism the shards wedge the suite
+        # flakily (harness stalls, no test at fault — every file passes
+        # alone and in pairs). Two shards keep CI deterministic; every
+        # test still runs.
         run: |
           set -o pipefail
-          run_probe() {
-            # NOTE: GitHub runs steps with `bash -e`; the `||` keeps a
-            # failing probe from aborting the remaining probes, and the
-            # failure is recorded for the final verdict instead.
-            name="$1"; shift
-            echo "=== PROBE $name START ==="
-            code=0
-            timeout 300 flutter test --timeout 60s "$@" > "/tmp/probe_$name.log" 2>&1 || { code=$?; fail=1; }
-            if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
-            if [ $code -eq 124 ]; then echo "--- $name killed-log tail (in-flight shards) ---"; tail -60 "/tmp/probe_$name.log"; else tail -8 "/tmp/probe_$name.log"; fi
-            echo "=== PROBE $name END ==="
-          }
-          {
-            fail=0
-            run_probe S1-new-together test/core/l10n/ test/core/alarms/alarm_controller_test.dart test/features/ test/widget_test.dart
-            run_probe S2-new-concurrency2 --concurrency=2 test/core/l10n/ test/core/alarms/alarm_controller_test.dart test/features/ test/widget_test.dart
-            echo "ALL PROBES DONE, failures=$fail"
-            test "$fail" -eq 0
-          } 2>&1 | tee /tmp/test.log
-
+          flutter test --concurrency=2 2>&1 | tee /tmp/test.log
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
       - name: Surface logs on failure

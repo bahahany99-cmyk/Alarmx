@@ -14,9 +14,11 @@ void main() {
     stack = TestStack();
   });
 
-  tearDown(() async {
-    await stack.close();
-  });
+  // NOTE: the stack is intentionally not closed. Widget tests leave live
+  // stream subscriptions behind (the tree disposes after tearDown),
+  // and closing the in-memory database underneath them races with
+  // stream delivery. Each test builds a fresh stack; the isolate exit
+  // reclaims the abandoned in-memory database.
 
   testWidgets('app shell shows the home screen', (WidgetTester tester) async {
     await pumpAlarmxApp(tester, stack);
@@ -39,7 +41,7 @@ void main() {
         settings: stack.settings,
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpSettle(tester);
 
     expect(find.text(AppStrings.forCode('ar').homeTitle), findsOneWidget);
     final Directionality directionality =
@@ -53,9 +55,9 @@ void main() {
     expect(find.text(AppStrings.forCode('ar').homeTitle), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.language));
-    await tester.pumpAndSettle();
+    await pumpSettle(tester);
     await tester.tap(find.text(AppStrings.forCode('ar').langEnglish));
-    await tester.pumpAndSettle();
+    await pumpSettle(tester);
 
     expect(find.text(AppStrings.forCode('en').homeTitle), findsOneWidget);
     expect((await stack.settings.getSettings()).language, 'en');
