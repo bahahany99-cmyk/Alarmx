@@ -91,11 +91,36 @@ void main() {
         '{"text": null}',
         '{"value": ["x"]}',
         '{"count": "10"}',
+      ];
+      // Count-bearing objects are *valid* shake configs (unknown fields are
+      // ignored), so the math difficulty shapes are asserted per-type.
+      expect(
+        parseMissionConfig(MissionType.shake, '{"count": 5}'),
+        isA<ShakeMissionConfig>(),
+      );
+      expect(
+        parseMissionConfig(
+          MissionType.shake,
+          '{"count": 5, "difficulty": "insane"}',
+        ),
+        isA<ShakeMissionConfig>(),
+      );
+      expect(
+        parseMissionConfig(MissionType.shake, '{"count": "10"}'),
+        isNull,
+      );
+      for (final String json in <String>[
         '{"count": 5}',
         '{"count": 5, "difficulty": "insane"}',
         '{"count": 5, "difficulty": null}',
         '{"count": 5, "difficulty": 42}',
-      ];
+      ]) {
+        expect(
+          parseMissionConfig(MissionType.math, json),
+          isNull,
+          reason: json,
+        );
+      }
       for (final String? json in bad) {
         for (final MissionType type in MissionType.values) {
           if (type == MissionType.none) {
