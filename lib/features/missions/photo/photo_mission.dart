@@ -17,8 +17,6 @@ import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../mission_config.dart';
-
 /// Outcome of one photo capture attempt.
 sealed class PhotoCaptureOutcome {
   const PhotoCaptureOutcome();
