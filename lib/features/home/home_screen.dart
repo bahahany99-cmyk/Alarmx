@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openSecurity() {
+  void _openSecurity() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityScreen(
@@ -130,12 +130,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // before even asking for confirmation; anything else deletes as
     // before, with no extra friction.
     if (alarm.strictMode) {
-      final bool pinOn;
+      bool pinOn = false;
       try {
         pinOn = await widget.pinService.isPinEnabled();
-      } catch (_) {
-        pinOn = false;
-      }
+      } catch (_) {}
       if (pinOn && mounted) {
         final String? pin = await showPinPrompt(
           context,
@@ -144,12 +142,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (pin == null || !mounted) {
           return;
         }
-        final bool ok;
+        bool ok = false;
         try {
           ok = await widget.pinService.verifyPin(pin);
-        } catch (_) {
-          ok = false;
-        }
+        } catch (_) {}
         if (!mounted) {
           return;
         }

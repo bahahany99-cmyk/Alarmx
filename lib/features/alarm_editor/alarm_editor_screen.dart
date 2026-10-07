@@ -252,12 +252,10 @@ class _EditorFormState extends State<_EditorForm> {
     if (pin == null || !mounted) {
       return;
     }
-    final bool ok;
+    bool ok = false;
     try {
       ok = await widget.pinService.verifyPin(pin);
-    } catch (_) {
-      ok = false;
-    }
+    } catch (_) {}
     if (!mounted) {
       return;
     }
@@ -402,12 +400,10 @@ class _EditorFormState extends State<_EditorForm> {
         if (!mounted || pin == null) {
           return;
         }
-        final bool ok;
+        bool ok = false;
         try {
           ok = await widget.pinService.verifyPin(pin);
-        } catch (_) {
-          ok = false;
-        }
+        } catch (_) {}
         if (!mounted) {
           return;
         }
@@ -923,8 +919,6 @@ class _TogglesCard extends StatelessWidget {
   }
 }
 
-/// Snooze configuration (stored only; no execution in this phase).
-class _SnoozeCard extends StatelessWidget {
 /// Strict Mode toggle (Phase 5).
 ///
 /// Flipping the switch only edits the draft; turning Strict off a
@@ -955,6 +949,7 @@ class _StrictCard extends StatelessWidget {
   }
 }
 
+/// Snooze configuration (stored only; no execution in this phase).
 class _SnoozeCard extends StatelessWidget {
   const _SnoozeCard({required this.draft, required this.onChanged});
 

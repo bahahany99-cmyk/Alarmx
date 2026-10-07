@@ -16,9 +16,8 @@ Future<int> seedStrictAlarm(TestStack stack, Duration offset) async {
   final Alarm? alarm = await stack.repository.getAlarmById(id);
   await stack.repository.updateAlarm(
     alarm!.copyWith(
-      strictMode: const Value<bool>(true),
-      nextTriggerAt:
-          Value<DateTime?>(DateTime.now().add(offset)),
+      strictMode: true,
+      nextTriggerAt: Value<DateTime?>(DateTime.now().add(offset)),
     ),
   );
   return id;
