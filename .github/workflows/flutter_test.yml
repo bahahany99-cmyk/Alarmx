@@ -52,6 +52,16 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
+          import subprocess
+
+          # TEMP DIAGNOSTIC: pull failing-test lines out of the full log.
+          probe = subprocess.run(
+              ['grep', '-E', '-m', '80', r'\[E\]|Test failed|EXCEPTION|Expected:|Actual:|Which:',
+               '/tmp/test.log'],
+              capture_output=True, text=True, errors='replace')
+          if probe.stdout.strip():
+              msg = probe.stdout.strip().replace('%', '%25').replace('\n', '%0A')
+              print(f'::error title=fail-lines::{msg[:4000]}')
 
           def read_tail(path, count=120):
               try:
