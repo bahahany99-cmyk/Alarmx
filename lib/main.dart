@@ -202,6 +202,7 @@ class _AlarmxAppState extends State<AlarmxApp> {
           home: _ringingFinished
               ? HomeScreen(
                   controller: _controller,
+                  missionService: widget.missionService,
                   languageCode: languageCode,
                   onLanguageChanged: _setLanguage,
                 )
@@ -222,6 +223,7 @@ class _AlarmxAppState extends State<AlarmxApp> {
                     if (launch == null || bridge == null) {
                       return HomeScreen(
                         controller: _controller,
+                        missionService: widget.missionService,
                         languageCode: languageCode,
                         onLanguageChanged: _setLanguage,
                       );

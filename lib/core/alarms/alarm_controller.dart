@@ -29,6 +29,7 @@ class AlarmUiResult {
     required this.ok,
     required this.persisted,
     required this.messageKey,
+    this.alarmId,
   });
 
   /// True when the desired end state was fully reached (row persisted AND
@@ -41,6 +42,10 @@ class AlarmUiResult {
 
   /// [AppStrings] message key the UI shows to the user.
   final String messageKey;
+
+  /// The alarm's id for schedule-family outcomes; `null` otherwise.
+  /// Lets the editor save missions for a just-created alarm.
+  final int? alarmId;
 }
 
 /// UI entry point for alarm operations; see the file docs.
@@ -86,6 +91,7 @@ class AlarmController {
       result,
       scheduledKey: 'msgAlarmSaved',
       context: 'createAlarm($id)',
+      alarmId: id,
     );
   }
 
@@ -119,6 +125,7 @@ class AlarmController {
       result,
       scheduledKey: 'msgAlarmUpdated',
       context: 'updateAlarm(${row.id})',
+      alarmId: row.id,
     );
   }
 
@@ -193,6 +200,7 @@ class AlarmController {
       result,
       scheduledKey: 'msgAlarmEnabled',
       context: 'setEnabled($id, true)',
+      alarmId: id,
     );
   }
 
@@ -245,6 +253,7 @@ class AlarmController {
     AlarmScheduleResult result, {
     required String scheduledKey,
     required String context,
+    int? alarmId,
   }) {
     switch (result) {
       case AlarmScheduled(:final triggerAt):
@@ -253,6 +262,7 @@ class AlarmController {
           ok: true,
           persisted: true,
           messageKey: scheduledKey,
+          alarmId: alarmId,
         );
       case AlarmDisabled():
         // Desired end state for a disabled alarm: nothing scheduled.
@@ -260,30 +270,34 @@ class AlarmController {
           ok: true,
           persisted: true,
           messageKey: scheduledKey,
+          alarmId: alarmId,
         );
       case AlarmNotSchedulable(:final reason):
         debugPrint('AlarmController.$context: not schedulable: $reason');
-        return const AlarmUiResult(
+        return AlarmUiResult(
           ok: false,
           persisted: true,
           messageKey: 'msgNotSchedulable',
+          alarmId: alarmId,
         );
       case AlarmPermissionMissing():
         debugPrint('AlarmController.$context: exact-alarm permission missing');
-        return const AlarmUiResult(
+        return AlarmUiResult(
           ok: false,
           persisted: true,
           messageKey: 'msgNoPermission',
+          alarmId: alarmId,
         );
       case AlarmScheduleFailed(:final error):
         debugPrint('AlarmController.$context: scheduling failed: $error');
         // The row is persisted but no schedule exists; the message must
         // say exactly that (the coordinator already rolled its native
         // state back, so no leaked schedule is claimed).
-        return const AlarmUiResult(
+        return AlarmUiResult(
           ok: false,
           persisted: true,
           messageKey: 'msgScheduleFailed',
+          alarmId: alarmId,
         );
     }
   }

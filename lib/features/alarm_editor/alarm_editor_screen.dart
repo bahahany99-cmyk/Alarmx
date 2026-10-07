@@ -1,9 +1,9 @@
-// Create/edit alarm screen (Phase 3).
+// Create/edit alarm screen (Phase 3; stop missions added in Phase 4).
 //
 // Scrollable form over every Phase 3-supported database field: time,
 // label, repeat (once/daily/custom via the typed `RepeatType`/`RepeatDays`
 // models — the bitmask logic is never duplicated here), sound, volume,
-// vibration, fade-in, snooze, and a stop-mission placeholder.
+// vibration, fade-in, snooze, and stop missions.
 //
 // Boundaries (deliberate):
 //   - Save converts the [AlarmDraft] to a companion/row and calls the
@@ -13,15 +13,20 @@
 //     execution belongs to the later Snooze phase (caption says so).
 //   - Fade-in and custom-sound values are stored config; the current
 //     native service still plays the default ringtone (captions say so).
-//   - `strictMode` is preserved without a control; the mission section is
-//     a static placeholder (no mission rows are read or written).
+//   - `strictMode` is preserved without a control; the mission section
+//     edits in-memory drafts and saves them together with the alarm
+//     (pre-validated before the alarm row is written, so an invalid
+//     mission list never leaves a half-written alarm behind).
 
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
+import 'package:alarmx/features/alarm_editor/mission_section.dart';
 import 'package:alarmx/features/home/alarm_formatters.dart';
+import 'package:alarmx/features/missions/mission_config.dart';
+import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:flutter/material.dart';
 
 /// Create (no [alarmId]) or edit form; see the file docs.
@@ -29,15 +34,20 @@ class AlarmEditorScreen extends StatefulWidget {
   const AlarmEditorScreen.create({
     super.key,
     required this.controller,
+    required this.missions,
   }) : alarmId = null;
 
   const AlarmEditorScreen.edit({
     super.key,
     required this.controller,
+    required this.missions,
     required int this.alarmId,
   });
 
   final AlarmController controller;
+
+  /// Validated mission-list operations for the missions section.
+  final MissionService missions;
 
   /// Null for create, the stored id for edit.
   final int? alarmId;
@@ -67,6 +77,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         title: strings.createAlarmTitle,
         child: _EditorForm(
           controller: widget.controller,
+          missions: widget.missions,
           existing: null,
         ),
       );
@@ -104,6 +115,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           child: _EditorForm(
             key: ValueKey<int>(alarm.id),
             controller: widget.controller,
+            missions: widget.missions,
             existing: alarm,
           ),
         );
@@ -135,10 +147,12 @@ class _EditorForm extends StatefulWidget {
   const _EditorForm({
     super.key,
     required this.controller,
+    required this.missions,
     required this.existing,
   });
 
   final AlarmController controller;
+  final MissionService missions;
   final Alarm? existing;
 
   @override
@@ -154,6 +168,72 @@ class _EditorFormState extends State<_EditorForm> {
   late final TextEditingController _soundUriController =
       TextEditingController(text: _draft.soundUri);
   bool _saving = false;
+
+  /// Mission drafts edited by the section; empty in create mode, loaded
+  /// from storage in edit mode (see [_loadMissions]).
+  List<MissionDraft> _missionDrafts = <MissionDraft>[];
+  bool _missionsLoading = false;
+  bool _missionsLoadFailed = false;
+  bool _missionsDroppedInvalid = false;
+  Future<void>? _missionsLoad;
+
+  @override
+  void initState() {
+    super.initState();
+    final Alarm? existing = widget.existing;
+    if (existing != null) {
+      _missionsLoading = true;
+      _missionsLoad = _loadMissions(existing.id);
+    }
+  }
+
+  /// Loads stored missions into drafts. Unexecutable rows (malformed or
+  /// invalid configs) are dropped with a visible warning; `none` rows are
+  /// inert and skipped silently. Never throws: failures set
+  /// [_missionsLoadFailed] so saving stays blocked until a retry succeeds.
+  Future<void> _loadMissions(int alarmId) async {
+    try {
+      final AlarmMissions loaded =
+          await widget.missions.getMissionsForAlarm(alarmId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _missionDrafts = <MissionDraft>[
+          for (final MissionEntry entry in loaded.entries)
+            MissionDraft(
+              id: entry.id,
+              type: entry.type,
+              config: entry.config,
+              required: entry.required,
+            ),
+        ];
+        _missionsDroppedInvalid = loaded.invalidCount > 0;
+        _missionsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('AlarmEditorScreen: mission load failed: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _missionsLoading = false;
+        _missionsLoadFailed = true;
+      });
+    }
+  }
+
+  void _retryMissionsLoad() {
+    final Alarm? existing = widget.existing;
+    if (existing == null) {
+      return;
+    }
+    setState(() {
+      _missionsLoading = true;
+      _missionsLoadFailed = false;
+    });
+    _missionsLoad = _loadMissions(existing.id);
+  }
 
   @override
   void dispose() {
@@ -210,6 +290,29 @@ class _EditorFormState extends State<_EditorForm> {
       _saving = true;
     });
     try {
+      final Future<void>? pendingMissions = _missionsLoad;
+      if (pendingMissions != null) {
+        await pendingMissions;
+      }
+      if (!mounted) {
+        return;
+      }
+      if (_missionsLoadFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.msgMissionsLoadFailed)),
+        );
+        return;
+      }
+      // Pre-validate before writing anything: an invalid mission list must
+      // never leave a half-written alarm behind.
+      final List<String> missionErrors =
+          MissionService.validateDrafts(_missionDrafts);
+      if (missionErrors.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.text(missionErrors.first))),
+        );
+        return;
+      }
       final Alarm? existing = widget.existing;
       final AlarmUiResult result = existing == null
           ? await widget.controller.createAlarm(_draft.toCompanion())
@@ -218,6 +321,48 @@ class _EditorFormState extends State<_EditorForm> {
         return;
       }
       if (result.persisted) {
+        final int? alarmId = result.alarmId ?? existing?.id;
+        if (alarmId == null) {
+          // The alarm row exists but its id is unknown; staying open so
+          // the missions are never silently dropped.
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(strings.msgMissionSaveFailed)),
+          );
+          return;
+        }
+        try {
+          await widget.missions
+              .saveMissionsForAlarm(alarmId, _missionDrafts);
+        } on MissionValidationException catch (validation) {
+          // Defensive: drafts were pre-validated above, so this only
+          // fires if drafts change mid-save (single-threaded: never).
+          if (!mounted) {
+            return;
+          }
+          final List<String> keys = validation.messageKeys;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                strings.text(
+                  keys.isEmpty ? 'msgMissionInvalid' : keys.first,
+                ),
+              ),
+            ),
+          );
+          return;
+        } catch (e) {
+          debugPrint('AlarmEditorScreen: mission save failed: $e');
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(strings.msgMissionSaveFailed)),
+          );
+          return;
+        }
+        if (!mounted) {
+          return;
+        }
         Navigator.of(context).pop(result);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -311,7 +456,14 @@ class _EditorFormState extends State<_EditorForm> {
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 12),
-              const _MissionPlaceholder(),
+              MissionSectionCard(
+                drafts: _missionDrafts,
+                isLoading: _missionsLoading,
+                loadFailed: _missionsLoadFailed,
+                droppedInvalid: _missionsDroppedInvalid,
+                onChanged: () => setState(() {}),
+                onRetryLoad: _retryMissionsLoad,
+              ),
             ],
           ),
         ),
@@ -729,28 +881,6 @@ class _SnoozeCard extends StatelessWidget {
               style: theme.textTheme.bodySmall,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Static stop-mission placeholder: no mission rows are read or written in
-/// this phase, and no mission engines exist yet. The section reserves the
-/// editor slot the future mission selector will plug into.
-class _MissionPlaceholder extends StatelessWidget {
-  const _MissionPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final AppStrings strings = AppStrings.of(context);
-    return Card(
-      child: ListTile(
-        enabled: false,
-        leading: const Icon(Icons.emoji_events_outlined),
-        title: Text(strings.missionTitle),
-        subtitle: Text(
-          '${strings.missionNone} — ${strings.missionCaption}',
         ),
       ),
     );

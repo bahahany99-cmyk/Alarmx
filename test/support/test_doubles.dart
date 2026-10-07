@@ -226,6 +226,7 @@ Future<void> pumpHome(
       localizationsDelegates: testDelegates,
       home: HomeScreen(
         controller: stack.controller,
+        missionService: stack.missions,
         languageCode: language,
         onLanguageChanged: onLanguageChanged ?? (_) {},
       ),
@@ -251,9 +252,13 @@ Future<void> pumpEditor(
       supportedLocales: testLocales,
       localizationsDelegates: testDelegates,
       home: alarmId == null
-          ? AlarmEditorScreen.create(controller: stack.controller)
+          ? AlarmEditorScreen.create(
+              controller: stack.controller,
+              missions: stack.missions,
+            )
           : AlarmEditorScreen.edit(
               controller: stack.controller,
+              missions: stack.missions,
               alarmId: alarmId,
             ),
     ),

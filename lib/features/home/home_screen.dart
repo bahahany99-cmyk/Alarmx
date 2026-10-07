@@ -15,6 +15,7 @@ import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
+import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/home/widgets/alarm_list_tile.dart';
 import 'package:flutter/material.dart';
 
@@ -23,12 +24,16 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.controller,
+    required this.missionService,
     required this.languageCode,
     required this.onLanguageChanged,
   });
 
   /// UI-to-engine bridge for all alarm operations.
   final AlarmController controller;
+
+  /// Validated mission-list operations for the alarm editor.
+  final MissionService missionService;
 
   /// Active UI language code ('ar'/'en'), for the menu checkmark.
   final String languageCode;
@@ -49,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<AlarmUiResult>(
         builder: (_) => AlarmEditorScreen.create(
           controller: widget.controller,
+          missions: widget.missionService,
         ),
       ),
     );
@@ -63,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<AlarmUiResult>(
         builder: (_) => AlarmEditorScreen.edit(
           controller: widget.controller,
+          missions: widget.missionService,
           alarmId: alarm.id,
         ),
       ),

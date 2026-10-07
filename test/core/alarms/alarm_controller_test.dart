@@ -53,6 +53,16 @@ void main() {
   });
 
   group('createAlarm', () {
+    test('create result carries the new alarm id', () async {
+      final AlarmUiResult result =
+          await stack.controller.createAlarm(dailyCompanion());
+
+      expect(result.persisted, isTrue);
+      final List<Alarm> alarms = await stack.repository.getAlarms();
+      expect(alarms, hasLength(1));
+      expect(result.alarmId, alarms.single.id);
+    });
+
     test('daily alarm is saved, scheduled and reported', () async {
       final AlarmUiResult result =
           await stack.controller.createAlarm(dailyCompanion(label: 'Work'));
@@ -128,6 +138,27 @@ void main() {
   });
 
   group('updateAlarm', () {
+    test('update result carries the row id', () async {
+      final int id = await stack.insertAlarm();
+      final Alarm? current = await stack.repository.getAlarmById(id);
+      final AlarmUiResult result =
+          await stack.controller.updateAlarm(current!);
+
+      expect(result.persisted, isTrue);
+      expect(result.alarmId, id);
+    });
+
+    test('missing-row result carries no id', () async {
+      final int id = await stack.insertAlarm();
+      final Alarm? current = await stack.repository.getAlarmById(id);
+      final AlarmUiResult result = await stack.controller.updateAlarm(
+        current!.copyWith(id: id + 100),
+      );
+
+      expect(result.persisted, isFalse);
+      expect(result.alarmId, isNull);
+    });
+
     test('edits reschedule through the coordinator', () async {
       final int id = await stack.insertAlarm(hour: 7);
       await stack.coordinator.scheduleAlarm(id);
