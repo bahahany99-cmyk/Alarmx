@@ -196,9 +196,9 @@ Future<void> pumpSettle(WidgetTester tester) async {
 Future<void> pumpAlarmxApp(
   WidgetTester tester,
   TestStack stack, {
-  currentTesterForTeardown = tester;
   String language = AppLanguage.english,
 }) async {
+  currentTesterForTeardown = tester;
   await stack.setLanguage(language);
   await tester.pumpWidget(
     AlarmxApp(
@@ -214,10 +214,10 @@ Future<void> pumpAlarmxApp(
 Future<void> pumpHome(
   WidgetTester tester,
   TestStack stack, {
-  currentTesterForTeardown = tester;
   String language = AppLanguage.english,
   ValueChanged<String>? onLanguageChanged,
 }) async {
+  currentTesterForTeardown = tester;
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),
@@ -241,10 +241,10 @@ Future<void> pumpHome(
 Future<void> pumpEditor(
   WidgetTester tester,
   TestStack stack, {
-  currentTesterForTeardown = tester;
   String language = AppLanguage.english,
   int? alarmId,
 }) async {
+  currentTesterForTeardown = tester;
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),
