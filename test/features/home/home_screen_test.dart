@@ -16,11 +16,13 @@ void main() {
     stack = TestStack();
   });
 
-  // NOTE: the stack is intentionally not closed. Widget tests leave live
-  // stream subscriptions behind (the tree disposes after tearDown),
-  // and closing the in-memory database underneath them races with
-  // stream delivery. Each test builds a fresh stack; the isolate exit
-  // reclaims the abandoned in-memory database.
+  tearDown(() async {
+    // Dispose widgets FIRST (cancels Drift watch subscriptions), then close
+    // the database. Deterministic per-test cleanup: no leaked connections
+    // accumulate across the suite.
+    await disposeLastTree();
+    await stack.close();
+  });
 
   group('list rendering', () {
     testWidgets('empty state offers adding an alarm',
