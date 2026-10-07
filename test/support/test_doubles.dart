@@ -172,7 +172,9 @@ const List<Locale> testLocales = <Locale>[
 /// drift's unsubscribe timer is still pending at the postTest check, the
 /// test fails, and the failure wedges the shard's finalization.
 Future<void> finishWidgetTest(WidgetTester tester, TestStack stack) async {
-  await tester.pumpWidget(const SizedBox());
+  // SizedBox.expand (not SizedBox): keep the full test viewport so the dying
+  // tree never relayouts at zero size (which reports overflow errors).
+  await tester.pumpWidget(const SizedBox.expand());
   await pumpSettle(tester);
   await stack.close();
 }
