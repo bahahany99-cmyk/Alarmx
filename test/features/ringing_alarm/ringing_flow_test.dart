@@ -5,7 +5,6 @@ import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_alarm_bridge.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_launch.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_mission_screen.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -89,7 +88,6 @@ Future<int> seedRingingAlarm(
   bool strict = false,
   bool snoozeEnabled = true,
   int snoozeMinutes = 10,
-  DateTime? nextTriggerAt,
 }) async {
   final int id = await stack.insertAlarm(hour: 7, minute: 30);
   final Alarm? alarm = await stack.repository.getAlarmById(id);
@@ -98,10 +96,18 @@ Future<int> seedRingingAlarm(
       strictMode: strict,
       snoozeEnabled: snoozeEnabled,
       snoozeMinutes: snoozeMinutes,
-      nextTriggerAt: Value<DateTime?>(nextTriggerAt),
     ),
   );
   return id;
+}
+
+/// Schedules [id] through the coordinator (the production path that
+/// persists `nextTriggerAt`) and returns the stored trigger token.
+Future<DateTime> scheduleToken(TestStack stack, int id) async {
+  await stack.coordinator.scheduleAlarm(id, now: DateTime.now());
+  final Alarm? alarm = await stack.repository.getAlarmById(id);
+  stack.scheduler.scheduledTriggers.clear();
+  return alarm!.nextTriggerAt!;
 }
 
 void main() {
@@ -237,13 +243,8 @@ void main() {
   group('snooze', () {
     testWidgets('snooze defers through the coordinator and records',
         (WidgetTester tester) async {
-      final DateTime token = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch,
-      );
-      final int alarmId = await seedRingingAlarm(
-        stack,
-        nextTriggerAt: token,
-      );
+      final int alarmId = await seedRingingAlarm(stack);
+      final DateTime token = await scheduleToken(stack, alarmId);
       final FlowBridge bridge = FlowBridge();
       int finished = 0;
       await pumpFlow(
@@ -303,14 +304,11 @@ void main() {
     });
 
     testWidgets('snooze hidden when disabled', (WidgetTester tester) async {
-      final DateTime token = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch,
-      );
       final int alarmId = await seedRingingAlarm(
         stack,
         snoozeEnabled: false,
-        nextTriggerAt: token,
       );
+      final DateTime token = await scheduleToken(stack, alarmId);
       final FlowBridge bridge = FlowBridge();
       await pumpFlow(
         tester,
@@ -330,13 +328,8 @@ void main() {
 
     testWidgets('snooze stop-leg retry never schedules twice',
         (WidgetTester tester) async {
-      final DateTime token = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch,
-      );
-      final int alarmId = await seedRingingAlarm(
-        stack,
-        nextTriggerAt: token,
-      );
+      final int alarmId = await seedRingingAlarm(stack);
+      final DateTime token = await scheduleToken(stack, alarmId);
       final FlowBridge bridge = FlowBridge()
         ..stopErrors.add(StateError('native down'));
       int finished = 0;
