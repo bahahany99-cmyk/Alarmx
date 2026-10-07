@@ -1,17 +1,59 @@
+import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/main.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void main() {
-  testWidgets('Native pipeline test screen shows controls',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+import 'support/test_doubles.dart';
 
-    expect(find.text('AlarmX - Native Pipeline Test'), findsOneWidget);
-    expect(find.text('Schedule test alarm in 10 seconds'), findsOneWidget);
-    expect(find.text('Cancel test alarm'), findsOneWidget);
-    expect(find.text('Check exact alarm permission'), findsOneWidget);
-    expect(find.text('TEMP: Persisted alarm (~2 min)'), findsOneWidget);
-    expect(find.text('TEMP: Cancel persisted test'), findsOneWidget);
-    expect(find.text('No action yet'), findsOneWidget);
+// App-shell tests: the production AlarmxApp with a real in-memory stack.
+
+void main() {
+  late TestStack stack;
+
+  setUp(() {
+    stack = TestStack();
+  });
+
+  tearDown(() async {
+    await stack.close();
+  });
+
+  testWidgets('app shell shows the home screen', (WidgetTester tester) async {
+    await pumpAlarmxApp(tester, stack);
+
+    expect(find.text(AppStrings.forCode('en').homeTitle), findsOneWidget);
+    expect(
+      find.text(AppStrings.forCode('en').homeEmptyTitle),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('add_alarm_fab')), findsOneWidget);
+  });
+
+  testWidgets('schema-default Arabic renders an RTL UI',
+      (WidgetTester tester) async {
+    // No language forced: the settings row is created with schema default.
+    await tester.pumpWidget(
+      AlarmxAppFromStack(stack: stack),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.forCode('ar').homeTitle), findsOneWidget);
+    final Directionality directionality =
+        tester.widget(find.byType(Directionality).first);
+    expect(directionality.textDirection, TextDirection.rtl);
+  });
+
+  testWidgets('language menu switches and persists the language',
+      (WidgetTester tester) async {
+    await pumpAlarmxApp(tester, stack, language: 'ar');
+    expect(find.text(AppStrings.forCode('ar').homeTitle), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.language));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(AppStrings.forCode('ar').langEnglish));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.forCode('en').homeTitle), findsOneWidget);
+    expect((await stack.settings.getSettings()).language, 'en');
   });
 }

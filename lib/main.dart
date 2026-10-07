@@ -1,21 +1,35 @@
-// TEMPORARY: manual native pipeline test screen. Will be replaced by the real home screen later.
+// AlarmX production entry point: real app shell (Phase 3).
+//
+// Startup order:
+//   1. App-start reconciliation over a short-lived database connection
+//      (reliability infrastructure from Phase 2.6, unchanged). Failure
+//      never blocks launch; a later lifecycle event retries.
+//   2. The app-lifetime database + repository + coordinator + settings.
+//   3. [AlarmxApp]: locale-aware MaterialApp, Home screen, post-fire
+//      rescheduling wiring, and persisted language selection.
+//
+// The temporary native-pipeline test screen is retired by this phase.
+
+import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/alarms/native_alarm_events.dart';
 import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
 import 'package:alarmx/core/bootstrap/app_bootstrap.dart';
 import 'package:alarmx/core/database/database.dart';
-import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
+import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
+import 'package:alarmx/features/home/home_screen.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
-/// Production entry point: reconciles stored alarms with the OS first
-/// (core reliability infrastructure, not UI), then shows the app.
+/// Production entry point; see the file docs.
 ///
-/// Reconciliation failure never blocks launch: the app still starts and a
-/// later lifecycle event retries. Widget tests pump [MyApp] directly and
-/// never call this, so their isolation is unaffected.
+/// Widget tests pump [AlarmxApp] directly with injected fakes/in-memory
+/// doubles and never call this, so their isolation is unaffected.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -23,277 +37,167 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('App-start reconciliation failed: $e');
   }
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AlarmX - Native Pipeline Test',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+  // App-lifetime database: opened once and intentionally never closed
+  // (closing would break the Home stream; the OS reclaims it with the
+  // process). Reconciliation above used its own short-lived connection.
+  final AppDatabase db = AppDatabase();
+  final AlarmRepository repository = DriftAlarmRepository(db.alarmDao);
+  runApp(
+    AlarmxApp(
+      repository: repository,
+      coordinator: AlarmSchedulingCoordinator(
+        repository: repository,
+        scheduler: const NativeAlarmSchedulerImpl(),
       ),
-      home: const NativePipelineTestScreen(),
-    );
-  }
+      settings: DriftAppSettingsRepository(db.appSettingsDao),
+    ),
+  );
 }
 
-class NativePipelineTestScreen extends StatefulWidget {
-  const NativePipelineTestScreen({super.key});
+/// Root widget: locale-aware app + app-shell services.
+///
+/// Owns the [AlarmController], the native post-fire listener (routes
+/// `onAlarmStopped` to `rescheduleAfterFire` so recurring alarms chain
+/// while the app is open), and the persisted UI language.
+class AlarmxApp extends StatefulWidget {
+  const AlarmxApp({
+    super.key,
+    required this.repository,
+    required this.coordinator,
+    required this.settings,
+    this.events,
+  });
+
+  final AlarmRepository repository;
+  final AlarmSchedulingCoordinator coordinator;
+  final AppSettingsRepository settings;
+
+  /// Event listener override for tests; production uses a live one.
+  final NativeAlarmEvents? events;
 
   @override
-  State<NativePipelineTestScreen> createState() =>
-      _NativePipelineTestScreenState();
+  State<AlarmxApp> createState() => _AlarmxAppState();
 }
 
-class _NativePipelineTestScreenState extends State<NativePipelineTestScreen> {
-  String _status = 'No action yet';
-  int? _persistedTestAlarmId;
-
-  // TEMP: single database + coordinator for the persisted-alarm test
-  // buttons below. Created lazily on first press, so plain widget tests
-  // that never press them are unaffected. The real app will own the
-  // database lifecycle properly.
-  late final AppDatabase _tempDb = AppDatabase();
-  late final AlarmRepository _tempRepo =
-      DriftAlarmRepository(_tempDb.alarmDao);
-  late final AlarmSchedulingCoordinator _tempCoordinator =
-      AlarmSchedulingCoordinator(
-    repository: _tempRepo,
-    scheduler: const NativeAlarmSchedulerImpl(),
+class _AlarmxAppState extends State<AlarmxApp> {
+  late final AlarmController _controller = AlarmController(
+    repository: widget.repository,
+    coordinator: widget.coordinator,
   );
+  late final NativeAlarmEvents _events = widget.events ?? NativeAlarmEvents();
+  late final Future<AppSetting> _settingsFuture =
+      widget.settings.getSettings();
 
-  // TEMP: listens for native post-fire stops (placeholder for real app
-  // wiring, which will attach this in the app shell instead).
-  final NativeAlarmEvents _tempEvents = NativeAlarmEvents();
+  /// Session language, set by the Home menu (also persisted best-effort).
+  String? _languageOverride;
 
   @override
   void initState() {
     super.initState();
-    _tempEvents.onAlarmStopped = _handlePersistedAlarmStopped;
-    _tempEvents.attach();
+    _events.onAlarmStopped = _handleAlarmStopped;
+    _events.attach();
   }
 
   @override
   void dispose() {
-    _tempEvents.detach();
+    _events.detach();
     super.dispose();
   }
 
-  Future<void> _scheduleTestAlarm() async {
-    try {
-      final NativeAlarmSchedulerImpl scheduler =
-          const NativeAlarmSchedulerImpl();
-      final DateTime triggerAt =
-          DateTime.now().add(const Duration(seconds: 10));
-      await scheduler.scheduleExactAlarm(alarmId: 1, triggerAt: triggerAt);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Scheduled alarm for $triggerAt';
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Schedule failed: $e';
-      });
-    }
-  }
-
-  Future<void> _cancelTestAlarm() async {
-    try {
-      final NativeAlarmSchedulerImpl scheduler =
-          const NativeAlarmSchedulerImpl();
-      await scheduler.cancelAlarm(alarmId: 1);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Cancelled alarm 1';
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Cancel failed: $e';
-      });
-    }
-  }
-
-  Future<void> _checkPermission() async {
-    try {
-      final NativeAlarmSchedulerImpl scheduler =
-          const NativeAlarmSchedulerImpl();
-      final bool canSchedule = await scheduler.canScheduleExactAlarms();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'canScheduleExactAlarms: $canSchedule';
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Permission check failed: $e';
-      });
-    }
-  }
-
-  // TEMP (Phase 2.3 device-test hook): creates a real database alarm ~2
-  // minutes out and schedules it through the coordinator, exercising the
-  // full persisted path (Drift -> coordinator -> native extras/ledger ->
-  // AlarmReceiver -> service ring). Each press creates a new row; use the
-  // cancel button to remove the last one.
-  Future<void> _schedulePersistedTestAlarm() async {
-    try {
-      final DateTime target = DateTime.now().add(const Duration(minutes: 2));
-      final int id = await _tempRepo.createAlarm(
-        AlarmsCompanion(
-          hour: Value(target.hour),
-          minute: Value(target.minute),
-          label: const Value<String?>('Persisted test'),
-          repeatType: Value(RepeatType.once.dbValue),
-          onceDate: Value(DateTime(target.year, target.month, target.day)),
-        ),
-      );
-      final AlarmScheduleResult result =
-          await _tempCoordinator.scheduleAlarm(id);
-      _persistedTestAlarmId = id;
-      if (!mounted) {
-        return;
-      }
-      final String outcome = switch (result) {
-        AlarmScheduled(:final triggerAt) =>
-          'Scheduled persisted alarm $id for $triggerAt',
-        AlarmNotSchedulable(:final reason) => 'Not schedulable: $reason',
-        AlarmDisabled() => 'Unexpected: alarm came back disabled',
-        AlarmPermissionMissing() => 'Exact-alarm permission missing',
-        AlarmScheduleFailed(:final error) => 'Schedule failed: $error',
-      };
-      setState(() {
-        _status = outcome;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Persisted test failed: $e';
-      });
-    }
-  }
-
-  // TEMP (Phase 2.4): routes a native post-fire stop to the coordinator so
-  // recurring alarms chain while the app is open, and reports the outcome.
-  Future<void> _handlePersistedAlarmStopped(
+  Future<void> _handleAlarmStopped(
     int alarmId,
     DateTime firedTriggerAt,
   ) async {
-    try {
-      final AlarmScheduleResult result =
-          await _tempCoordinator.rescheduleAfterFire(
-        alarmId: alarmId,
-        firedTriggerAt: firedTriggerAt,
-      );
-      if (!mounted) {
-        return;
-      }
-      final String outcome = switch (result) {
-        AlarmScheduled(:final triggerAt) =>
-          'Post-fire: rescheduled alarm $alarmId for $triggerAt',
-        AlarmNotSchedulable(:final reason) =>
-          'Post-fire: no further schedule ($reason)',
-        AlarmDisabled() =>
-          'Post-fire: alarm $alarmId disabled, not rescheduled',
-        AlarmPermissionMissing() => 'Post-fire: exact-alarm permission missing',
-        AlarmScheduleFailed(:final error) => 'Post-fire failed: $error',
-      };
-      setState(() {
-        _status = outcome;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Post-fire failed: $e';
-      });
-    }
+    final AlarmScheduleResult result =
+        await widget.coordinator.rescheduleAfterFire(
+      alarmId: alarmId,
+      firedTriggerAt: firedTriggerAt,
+    );
+    debugPrint(
+      'AlarmxApp: post-fire reschedule for alarm $alarmId: '
+      '${_describeResult(result)}',
+    );
   }
 
-  // TEMP: cancels the last persisted test alarm and deletes its row.
-  Future<void> _cancelPersistedTestAlarm() async {
+  String _describeResult(AlarmScheduleResult result) {
+    return switch (result) {
+      AlarmScheduled(:final triggerAt) => 'scheduled for $triggerAt',
+      AlarmNotSchedulable(:final reason) => 'not schedulable ($reason)',
+      AlarmDisabled() => 'alarm disabled',
+      AlarmPermissionMissing() => 'exact-alarm permission missing',
+      AlarmScheduleFailed(:final error) => 'failed ($error)',
+    };
+  }
+
+  Future<void> _setLanguage(String code) async {
+    final String normalized = AppLanguage.normalize(code);
     try {
-      final int? id = _persistedTestAlarmId;
-      if (id == null) {
-        setState(() {
-          _status = 'No persisted test alarm to cancel';
-        });
-        return;
-      }
-      await _tempCoordinator.cancelAlarm(id);
-      await _tempRepo.deleteAlarm(id);
-      _persistedTestAlarmId = null;
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Cancelled and deleted persisted test alarm $id';
-      });
+      await widget.settings.updateSettings(
+        AppSettingsCompanion(language: Value(normalized)),
+      );
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      // Persist failure must not block the switch: the UI still applies
+      // the language for this session and the stored value is retried on
+      // the next change.
+      debugPrint('AlarmxApp: could not persist language: $e');
+    }
+    if (mounted) {
       setState(() {
-        _status = 'Persisted cancel failed: $e';
+        _languageOverride = normalized;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AlarmX - Native Pipeline Test'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: _scheduleTestAlarm,
-              child: const Text('Schedule test alarm in 10 seconds'),
-            ),
-            ElevatedButton(
-              onPressed: _cancelTestAlarm,
-              child: const Text('Cancel test alarm'),
-            ),
-            ElevatedButton(
-              onPressed: _checkPermission,
-              child: const Text('Check exact alarm permission'),
-            ),
-            ElevatedButton(
-              onPressed: _schedulePersistedTestAlarm,
-              child: const Text('TEMP: Persisted alarm (~2 min)'),
-            ),
-            ElevatedButton(
-              onPressed: _cancelPersistedTestAlarm,
-              child: const Text('TEMP: Cancel persisted test'),
-            ),
-            const SizedBox(height: 16),
-            Text(_status),
+    return FutureBuilder<AppSetting>(
+      future: _settingsFuture,
+      builder: (BuildContext context, AsyncSnapshot<AppSetting> snapshot) {
+        final String languageCode = AppLanguage.normalize(
+          _languageOverride ?? snapshot.data?.language,
+        );
+        return MaterialApp(
+          title: 'AlarmX',
+          locale: Locale(languageCode),
+          supportedLocales: const <Locale>[
+            Locale(AppLanguage.arabic),
+            Locale(AppLanguage.english),
           ],
-        ),
-      ),
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.indigo,
+            ),
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.indigo,
+              brightness: Brightness.dark,
+            ),
+          ),
+          themeMode: _themeModeFrom(snapshot.data?.theme),
+          home: HomeScreen(
+            controller: _controller,
+            languageCode: languageCode,
+            onLanguageChanged: _setLanguage,
+          ),
+        );
+      },
     );
+  }
+
+  ThemeMode _themeModeFrom(String? theme) {
+    switch (theme) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
   }
 }

@@ -1,0 +1,215 @@
+// Shared doubles for Phase 3 UI/controller tests.
+//
+// Pattern (same as the coordinator tests): a REAL in-memory Drift stack
+// (repository + coordinator + controller) with a FAKE native scheduler that
+// records calls. Widgets are therefore exercised against true persistence
+// and scheduling orchestration; only the OS bridge is faked. Nothing here
+// touches MethodChannels, files, or the clock beyond pinned values.
+
+import 'package:alarmx/core/alarms/alarm_controller.dart';
+import 'package:alarmx/core/alarms/alarm_fire_config.dart';
+import 'package:alarmx/core/alarms/native_alarm_scheduler.dart';
+import 'package:alarmx/core/database/database.dart';
+import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/repositories/alarm_repository.dart';
+import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
+import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
+import 'package:alarmx/features/home/home_screen.dart';
+import 'package:alarmx/main.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Records native calls and replays scripted failures.
+///
+/// Same shape as the fake in the coordinator tests (which stays untouched);
+/// duplicated here so widget/controller tests do not import a `*_test.dart`
+/// file.
+class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
+  FakeNativeAlarmScheduler({this.canSchedule = true});
+
+  bool canSchedule;
+  Object? scheduleError;
+  Object? cancelError;
+  Object? checkError;
+  final List<String> calls = <String>[];
+  final List<int> scheduledIds = <int>[];
+  final List<DateTime> scheduledTriggers = <DateTime>[];
+  final List<AlarmFireConfig?> scheduledConfigs = <AlarmFireConfig?>[];
+  final List<int> cancelledIds = <int>[];
+
+  @override
+  Future<void> scheduleExactAlarm({
+    required int alarmId,
+    required DateTime triggerAt,
+    AlarmFireConfig? fireConfig,
+  }) async {
+    calls.add('schedule:$alarmId');
+    if (scheduleError != null) {
+      throw scheduleError!;
+    }
+    scheduledIds.add(alarmId);
+    scheduledTriggers.add(triggerAt);
+    scheduledConfigs.add(fireConfig);
+  }
+
+  @override
+  Future<void> cancelAlarm({required int alarmId}) async {
+    calls.add('cancel:$alarmId');
+    if (cancelError != null) {
+      throw cancelError!;
+    }
+    cancelledIds.add(alarmId);
+  }
+
+  @override
+  Future<bool> canScheduleExactAlarms() async {
+    if (checkError != null) {
+      throw checkError!;
+    }
+    return canSchedule;
+  }
+}
+
+/// Real in-memory engine stack for tests.
+class TestStack {
+  TestStack() {
+    db = AppDatabase.connect(NativeDatabase.memory());
+    repository = DriftAlarmRepository(db.alarmDao);
+    settings = DriftAppSettingsRepository(db.appSettingsDao);
+    scheduler = FakeNativeAlarmScheduler();
+    coordinator = AlarmSchedulingCoordinator(
+      repository: repository,
+      scheduler: scheduler,
+    );
+    controller = AlarmController(
+      repository: repository,
+      coordinator: coordinator,
+    );
+  }
+
+  late final AppDatabase db;
+  late final AlarmRepository repository;
+  late final AppSettingsRepository settings;
+  late final FakeNativeAlarmScheduler scheduler;
+  late final AlarmSchedulingCoordinator coordinator;
+  late final AlarmController controller;
+
+  Future<void> close() => db.close();
+
+  /// Inserts a daily alarm; returns its generated id.
+  Future<int> insertAlarm({
+    int hour = 7,
+    int minute = 30,
+    bool enabled = true,
+    String? label,
+    RepeatType repeatType = RepeatType.daily,
+    DateTime? onceDate,
+    int? repeatDays,
+    bool vibrationEnabled = true,
+  }) {
+    return repository.createAlarm(
+      AlarmsCompanion.insert(
+        hour: hour,
+        minute: minute,
+        enabled: Value(enabled),
+        label: Value(label),
+        vibrationEnabled: Value(vibrationEnabled),
+        repeatType: Value(repeatType.dbValue),
+        onceDate: Value(onceDate),
+        repeatDays: Value(repeatDays),
+      ),
+    );
+  }
+
+  /// Forces the stored UI language (creating the settings row first).
+  Future<void> setLanguage(String code) async {
+    await settings.getSettings();
+    await settings.updateSettings(
+      AppSettingsCompanion(language: Value(code)),
+    );
+  }
+}
+
+/// SDK localization delegates, shared by every pumped test app.
+const List<LocalizationsDelegate<dynamic>> testDelegates =
+    <LocalizationsDelegate<dynamic>>[
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+const List<Locale> testLocales = <Locale>[
+  Locale(AppLanguage.arabic),
+  Locale(AppLanguage.english),
+];
+
+/// Pumps the full production app shell in [language].
+Future<void> pumpAlarmxApp(
+  WidgetTester tester,
+  TestStack stack, {
+  String language = AppLanguage.english,
+}) async {
+  await stack.setLanguage(language);
+  await tester.pumpWidget(
+    AlarmxApp(
+      repository: stack.repository,
+      coordinator: stack.coordinator,
+      settings: stack.settings,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Pumps [HomeScreen] standalone in [language].
+Future<void> pumpHome(
+  WidgetTester tester,
+  TestStack stack, {
+  String language = AppLanguage.english,
+  ValueChanged<String>? onLanguageChanged,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: Locale(language),
+      supportedLocales: testLocales,
+      localizationsDelegates: testDelegates,
+      home: HomeScreen(
+        controller: stack.controller,
+        languageCode: language,
+        onLanguageChanged: onLanguageChanged ?? (_) {},
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Pumps [AlarmEditorScreen] standalone in [language].
+///
+/// The popped [AlarmUiResult] is not captured here; tests assert the save
+/// outcome through the repository + fake scheduler state instead (result
+/// mapping itself is covered by the controller tests).
+Future<void> pumpEditor(
+  WidgetTester tester,
+  TestStack stack, {
+  String language = AppLanguage.english,
+  int? alarmId,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: Locale(language),
+      supportedLocales: testLocales,
+      localizationsDelegates: testDelegates,
+      home: alarmId == null
+          ? AlarmEditorScreen.create(controller: stack.controller)
+          : AlarmEditorScreen.edit(
+              controller: stack.controller,
+              alarmId: alarmId,
+            ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
