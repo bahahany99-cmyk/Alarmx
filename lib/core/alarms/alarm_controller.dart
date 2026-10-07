@@ -85,7 +85,6 @@ class AlarmController {
     return _scheduledOutcome(
       result,
       scheduledKey: 'msgAlarmSaved',
-      failedKey: 'msgCreateFailed',
       context: 'createAlarm($id)',
     );
   }
@@ -119,7 +118,6 @@ class AlarmController {
     return _scheduledOutcome(
       result,
       scheduledKey: 'msgAlarmUpdated',
-      failedKey: 'msgUpdateFailed',
       context: 'updateAlarm(${row.id})',
     );
   }
@@ -246,7 +244,6 @@ class AlarmController {
   AlarmUiResult _scheduledOutcome(
     AlarmScheduleResult result, {
     required String scheduledKey,
-    required String failedKey,
     required String context,
   }) {
     switch (result) {
@@ -280,14 +277,13 @@ class AlarmController {
         );
       case AlarmScheduleFailed(:final error):
         debugPrint('AlarmController.$context: scheduling failed: $error');
-        // The schedule call failed despite the persisted row; `failedKey`
-        // keeps the message specific to the failed operation while the
-        // detail stays in the log. (The coordinator already rolled its
-        // native state back, so no leaked schedule is claimed.)
-        return AlarmUiResult(
+        // The row is persisted but no schedule exists; the message must
+        // say exactly that (the coordinator already rolled its native
+        // state back, so no leaked schedule is claimed).
+        return const AlarmUiResult(
           ok: false,
           persisted: true,
-          messageKey: failedKey,
+          messageKey: 'msgScheduleFailed',
         );
     }
   }

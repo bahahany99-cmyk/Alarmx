@@ -22,7 +22,6 @@ import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
 import 'package:alarmx/features/home/alarm_formatters.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 
 /// Create (no [alarmId]) or edit form; see the file docs.
@@ -75,7 +74,9 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
     return FutureBuilder<Alarm?>(
       future: _loadFuture,
       builder: (BuildContext context, AsyncSnapshot<Alarm?> snapshot) {
-        if (!snapshot.hasData && !snapshot.hasError) {
+        // NOTE: a completed load of a missing alarm yields data == null,
+        // so the waiting state must key off connectionState, not hasData.
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return _EditorScaffold(
             title: strings.editAlarmTitle,
             child: const Center(child: CircularProgressIndicator()),

@@ -33,7 +33,11 @@ void main() {
       (WidgetTester tester) async {
     // No language forced: the settings row is created with schema default.
     await tester.pumpWidget(
-      AlarmxAppFromStack(stack: stack),
+      AlarmxApp(
+        repository: stack.repository,
+        coordinator: stack.coordinator,
+        settings: stack.settings,
+      ),
     );
     await tester.pumpAndSettle();
 

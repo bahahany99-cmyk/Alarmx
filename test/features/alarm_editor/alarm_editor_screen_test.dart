@@ -237,14 +237,13 @@ void main() {
       await pumpEditor(tester, stack);
       await tapVisible(
         tester,
-        find.ancestor(
-          of: find.text(en.snoozeLabel),
-          matching: find.byType(Row),
-        ).first,
+        find.byKey(const Key('editor_snooze_switch')),
       );
-      // Tapping the row may miss the switch; tap the switch directly.
+      expect(find.text('5'), findsNothing);
+      await tester.tap(find.byKey(const Key('editor_save_button')));
       await tester.pumpAndSettle();
-      expect((await alarms()), isEmpty);
+
+      expect((await alarms()).single.snoozeEnabled, isFalse);
     });
 
     testWidgets('snooze duration and max count are stored',
