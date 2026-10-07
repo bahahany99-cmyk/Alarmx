@@ -79,6 +79,27 @@ jobs:
           for name in errors[:15]:
               print(f'  ERROR: {name}')
           print(f"wall-bound exit: {os.environ.get('CODE')} (124 = killed at 150s)")
+          print('--- exception dumps (full) ---')
+          shown = 0
+          for line in lines:
+              if shown >= 3:
+                  break
+              line = line.strip()
+              if not line.startswith('{'):
+                  continue
+              try:
+                  e = json.loads(line)
+              except ValueError:
+                  continue
+              if e.get('type') != 'print':
+                  continue
+              msg = str(e.get('message', ''))
+              if 'EXCEPTION CAUGHT' not in msg:
+                  continue
+              shown += 1
+              print(f'  DUMP #{shown} (test {e.get("testID")}):')
+              for fl in msg.splitlines()[:14]:
+                  print(f'    {fl[:170]}')
           print('--- first error details ---')
           shown = 0
           for line in lines:
