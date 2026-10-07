@@ -115,7 +115,8 @@ void main() {
       expect(rows.single.repeatType, 'daily');
       expect(rows.single.nextTriggerAt, isNotNull);
       expect(stack.scheduler.scheduledIds, <int>[rows.single.id]);
-      await finishWidgetTest(tester, stack);
+      // TEMP DIAGNOSTIC (E8): keep the settle, drop the close.
+      await pumpSettle(tester);
     });
 
     testWidgets('custom days are stored as the typed bitmask',
