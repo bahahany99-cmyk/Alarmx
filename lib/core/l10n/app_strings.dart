@@ -172,6 +172,7 @@ class AppStrings {
   String get barcodeValueLabel => text('barcodeValueLabel');
   String get scanCancel => text('scanCancel');
   String get scanWrongCode => text('scanWrongCode');
+  String get scanError => text('scanError');
   String get shakeInstruction => text('shakeInstruction');
   String get shakeCountLabel => text('shakeCountLabel');
   String get mathInstruction => text('mathInstruction');
@@ -307,6 +308,7 @@ class AppStrings {
     'barcodeValueLabel': 'قيمة الباركود المتوقعة',
     'scanCancel': 'إلغاء المسح',
     'scanWrongCode': 'رمز غير صحيح — حاول مجددًا',
+    'scanError': 'تعذّر المسح — حاول مجددًا',
     'shakeInstruction': 'هز هاتفك',
     'shakeCountLabel': 'عدد الهزات المطلوبة',
     'mathInstruction': 'حل لإيقاف المنبه',
@@ -444,6 +446,7 @@ class AppStrings {
     'barcodeValueLabel': 'Expected barcode value',
     'scanCancel': 'Cancel scan',
     'scanWrongCode': 'Wrong code — try again',
+    'scanError': 'Scanner error — try again',
     'shakeInstruction': 'Shake your phone',
     'shakeCountLabel': 'Required shakes',
     'mathInstruction': 'Solve to stop the alarm',
