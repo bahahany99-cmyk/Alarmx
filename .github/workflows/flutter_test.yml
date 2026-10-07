@@ -81,6 +81,12 @@ jobs:
           print(f'phase prints captured: {len(phases)}')
           for ph in phases[-12:]:
               print(f'  PHASE: {ph}')
+          print('--- raw head (first 30) ---')
+          for line in lines[:30]:
+              print(f'  RAW: {line[:200]}')
+          print('--- raw tail (last 15) ---')
+          for line in lines[-15:]:
+              print(f'  RAW: {line[:200]}')
           PY
           test "$code" -eq 0
       # Workflow logs are not always reachable from every environment, so mirror
