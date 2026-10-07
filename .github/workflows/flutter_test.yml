@@ -37,13 +37,33 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        # TEMP DIAGNOSTIC (Phase 3 hang hunt): bound every test to 30s and
-        # expand the reporter so a wedged test fails with its name in the
-        # log instead of stalling the suite. Reverted before the final
-        # Phase 3 report.
+        # TEMP DIAGNOSTIC (Phase 3 hang hunt): bisect the suite file by
+        # file, each probe bounded by GNU timeout so a wedged file yields
+        # a TIMEOUT verdict instead of stalling. Reverted after diagnosis.
         run: |
           set -o pipefail
-          flutter test --timeout 30s -r expanded 2>&1 | tee /tmp/test.log
+          run_probe() {
+            name="$1"; shift
+            echo "=== PROBE $name START ==="
+            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1
+            code=$?
+            if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
+            tail -6 "/tmp/probe_$name.log"
+            echo "=== PROBE $name END ==="
+          }
+          {
+            run_probe P0-old-pure test/core/models/ test/core/scheduling/next_occurrence_calculator_test.dart
+            run_probe P1-old-drift test/core/database/ test/core/scheduling/alarm_scheduling_coordinator_test.dart test/core/bootstrap/
+            run_probe P2-new-strings test/core/l10n/
+            run_probe P3-new-draft test/features/alarm_editor/alarm_draft_test.dart
+            run_probe P4-new-formatters test/features/home/alarm_formatters_test.dart
+            run_probe P5-new-controller test/core/alarms/alarm_controller_test.dart
+            run_probe P6-new-home test/features/home/home_screen_test.dart
+            run_probe P7-new-editor test/features/alarm_editor/alarm_editor_screen_test.dart
+            run_probe P8-new-shell test/widget_test.dart
+            run_probe P9-old-alarms test/core/alarms/
+            echo "ALL PROBES DONE"
+          } 2>&1 | tee /tmp/test.log
 
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
