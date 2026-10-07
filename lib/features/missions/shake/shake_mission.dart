@@ -48,7 +48,7 @@ class SensorsPlusShakeSource implements ShakeSensorSource {
   const SensorsPlusShakeSource();
 
   @override
-  Stream<AccelSample> get samples => sensors.accelerometerEvents.map(
+  Stream<AccelSample> get samples => sensors.accelerometerEventStream().map(
         (sensors.AccelerometerEvent event) =>
             AccelSample(event.x, event.y, event.z),
       );

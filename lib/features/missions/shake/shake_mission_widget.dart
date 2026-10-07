@@ -17,6 +17,7 @@ class ShakeMissionWidget extends StatefulWidget {
     required this.entry,
     required this.onCompleted,
     this.source = const SensorsPlusShakeSource(),
+    this.detector,
   });
 
   final MissionEntry entry;
@@ -24,6 +25,10 @@ class ShakeMissionWidget extends StatefulWidget {
 
   /// Sensor-source override for tests; production uses the accelerometer.
   final ShakeSensorSource source;
+
+  /// Detector override for tests (deterministic clock); production uses
+  /// the default thresholds with wall-clock time.
+  final ShakeDetector? detector;
 
   @override
   State<ShakeMissionWidget> createState() => _ShakeMissionWidgetState();
