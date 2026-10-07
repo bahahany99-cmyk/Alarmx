@@ -33,15 +33,20 @@ void main() {
     return row.read<int>('c');
   }
 
+  /// Scrolls the editor form until [finder] matches a built widget.
+  ///
+  /// The form is a lazily-built list: deep rows do not exist until they
+  /// scroll near the viewport. Drags up to ~10 screens, then leaves the
+  /// (possibly still missing) finder to the caller for a precise error.
+  Future<void> ensureBuilt(WidgetTester tester, Finder finder) async {
+    for (int i = 0; i < 10 && finder.evaluate().isEmpty; i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await pumpSettle(tester);
+    }
+  }
+
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
-    // scrollUntilVisible (not ensureVisible): the form is a lazily-built
-    // list, so deep rows may not exist yet; scrolling builds them.
-    await tester.scrollUntilVisible(
-      finder,
-      500,
-      scrollable: find.byType(ListView),
-    );
-    await pumpSettle(tester);
+    await ensureBuilt(tester, finder);
     await tester.tap(finder);
     await pumpSettle(tester);
   }
@@ -296,12 +301,7 @@ void main() {
     testWidgets('mission section creates no mission rows',
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
-      await tester.scrollUntilVisible(
-        find.text(en.missionTitle),
-        500,
-        scrollable: find.byType(ListView),
-      );
-      await pumpSettle(tester);
+      await ensureBuilt(tester, find.text(en.missionTitle));
       expect(find.text(en.missionTitle), findsOneWidget);
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
