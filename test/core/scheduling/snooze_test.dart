@@ -420,6 +420,7 @@ void main() {
       await openEpisode(id, stored);
       stack.scheduler.calls.clear();
       stack.scheduler.scheduledTriggers.clear();
+      stack.scheduler.scheduledConfigs.clear();
       final DateTime pressed = stored.add(const Duration(seconds: 30));
       final AlarmScheduleResult result = await stack.coordinator.snoozeAlarm(
         alarmId: id,

@@ -50,22 +50,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          import subprocess
-
-          # TEMP DIAGNOSTIC: name the failing tests.
-          probe = subprocess.run(
-              ['grep', '-m', '30', '❌', '/tmp/test.log'],
-              capture_output=True, text=True, errors='replace')
-          if probe.stdout.strip():
-              msg = probe.stdout.strip().replace('%', '%25').replace('\n', '%0A')
-              print(f'::error title=fail-names::{msg[:4000]}')
-          probe2 = subprocess.run(
-              ['grep', '-m', '2', '-A', '14',
-               'EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK', '/tmp/test.log'],
-              capture_output=True, text=True, errors='replace')
-          if probe2.stdout.strip():
-              msg2 = probe2.stdout.strip().replace('%', '%25').replace('\n', '%0A')
-              print(f'::error title=fail-lines::{msg2[:4000]}')
 
           def read_tail(path, count=120):
               try:
