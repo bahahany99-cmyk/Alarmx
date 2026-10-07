@@ -34,7 +34,13 @@ void main() {
   }
 
   Future<void> tapVisible(WidgetTester tester, Finder finder) async {
-    await tester.ensureVisible(finder);
+    // scrollUntilVisible (not ensureVisible): the form is a lazily-built
+    // list, so deep rows may not exist yet; scrolling builds them.
+    await tester.scrollUntilVisible(
+      finder,
+      500,
+      scrollable: find.byType(ListView),
+    );
     await pumpSettle(tester);
     await tester.tap(finder);
     await pumpSettle(tester);
@@ -290,6 +296,12 @@ void main() {
     testWidgets('mission section creates no mission rows',
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
+      await tester.scrollUntilVisible(
+        find.text(en.missionTitle),
+        500,
+        scrollable: find.byType(ListView),
+      );
+      await pumpSettle(tester);
       expect(find.text(en.missionTitle), findsOneWidget);
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
