@@ -43,10 +43,12 @@ jobs:
         run: |
           set -o pipefail
           run_probe() {
+            # NOTE: GitHub runs steps with `bash -e`; the `||` keeps a
+            # failing probe from aborting the remaining probes.
             name="$1"; shift
             echo "=== PROBE $name START ==="
-            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1
-            code=$?
+            code=0
+            timeout 180 flutter test --timeout 30s "$@" > "/tmp/probe_$name.log" 2>&1 || code=$?
             if [ $code -eq 124 ]; then echo "PROBE $name VERDICT: TIMEOUT-KILLED"; else echo "PROBE $name VERDICT: exit=$code"; fi
             tail -6 "/tmp/probe_$name.log"
             echo "=== PROBE $name END ==="

@@ -2,6 +2,8 @@ import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/test_doubles.dart';
+
 void main() {
   group('AppLanguage', () {
     test('normalize keeps supported codes', () {
@@ -55,12 +57,17 @@ void main() {
       expect(AppStrings.forCode('ar').text('no.such.key'), 'no.such.key');
     });
 
+    // NOTE: the ambient-locale pumps below must wire the real SDK
+    // delegates + supported locales: without them MaterialApp resolves
+    // every locale to English and the Arabic assertions would fail.
     testWidgets('of resolves from the ambient ar locale',
         (WidgetTester tester) async {
       late final AppStrings strings;
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('ar'),
+          supportedLocales: testLocales,
+          localizationsDelegates: testDelegates,
           home: Builder(
             builder: (BuildContext context) {
               strings = AppStrings.of(context);
@@ -78,6 +85,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
+          supportedLocales: testLocales,
+          localizationsDelegates: testDelegates,
           home: Builder(
             builder: (BuildContext context) {
               strings = AppStrings.of(context);
