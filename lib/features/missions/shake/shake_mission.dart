@@ -134,9 +134,13 @@ class ShakeMissionController extends ChangeNotifier {
     _subscription = _source.samples.listen(
       _onSample,
       onError: (_) {
+        // Drop the failed subscription (a retry re-subscribes; leaving it
+        // attached would double-count every later sample).
+        final StreamSubscription<AccelSample>? failed = _subscription;
+        _subscription = null;
         _sensorFailed = true;
         _started = false;
-        _subscription = null;
+        failed?.cancel();
         notifyListeners();
       },
       cancelOnError: false,
