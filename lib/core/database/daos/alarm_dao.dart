@@ -18,6 +18,17 @@ class AlarmDao extends DatabaseAccessor<AppDatabase> with _$AlarmDaoMixin {
         .watch();
   }
 
+  /// Returns every alarm row, in insertion order.
+  ///
+  /// Direct one-shot read (no watch stream): prefer this over
+  /// `watchAllAlarms().first`, whose cancel schedules drift's deferred
+  /// stream-cache timer.
+  Future<List<Alarm>> getAllAlarms() {
+    return (select(alarms)
+          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
+        .get();
+  }
+
   /// Returns a single alarm by its primary key, or `null` if not found.
   Future<Alarm?> getAlarmById(int id) {
     return (select(alarms)..where((t) => t.id.equals(id))).getSingleOrNull();

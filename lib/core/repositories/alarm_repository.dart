@@ -56,7 +56,7 @@ class DriftAlarmRepository implements AlarmRepository {
   Stream<List<Alarm>> watchAlarms() => _dao.watchAllAlarms();
 
   @override
-  Future<List<Alarm>> getAlarms() => _dao.watchAllAlarms().first;
+  Future<List<Alarm>> getAlarms() => _dao.getAllAlarms();
 
   @override
   Future<Alarm?> getAlarmById(int id) => _dao.getAlarmById(id);

@@ -101,17 +101,27 @@ void main() {
   });
 
   group('create save', () {
-    testWidgets('daily alarm without label is saved and scheduled',
+    testWidgets('daily alarm with label is saved and scheduled',
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
+      await tester.enterText(
+        find.byKey(const Key('editor_label_field')),
+        'Work',
+      );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
       // Popped back.
       expect(find.byKey(const Key('editor_save_button')), findsNothing);
-      // TEMP DIAGNOSTIC (E9): drop the one-shot read; keep pop proof.
-      // TEMP DIAGNOSTIC (E8): keep the settle, drop the close.
-      await pumpSettle(tester);
+      final List<Alarm> rows = await alarms();
+      expect(rows, hasLength(1));
+      expect(rows.single.label, 'Work');
+      expect(rows.single.hour, 7);
+      expect(rows.single.repeatType, 'daily');
+      expect(rows.single.nextTriggerAt, isNotNull);
+      expect(stack.scheduler.scheduledIds, <int>[rows.single.id]);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('custom days are stored as the typed bitmask',
