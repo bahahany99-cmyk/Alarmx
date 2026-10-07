@@ -280,7 +280,12 @@ void main() {
       final AlarmHistoryData episode =
           (await stack.history.getHistoryForAlarm(alarmId)).single;
       expect(episode.snoozeCount, 1);
-      expect(episode.stoppedAt, target);
+      // Drift stores DateTimes at whole-second precision; compare the
+      // pending target accordingly (both sides derive from it anyway).
+      expect(
+        episode.stoppedAt?.millisecondsSinceEpoch,
+        target.millisecondsSinceEpoch ~/ 1000 * 1000,
+      );
       await finishWidgetTest(tester, stack);
     });
 
