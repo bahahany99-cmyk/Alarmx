@@ -165,18 +165,17 @@ const List<Locale> testLocales = <Locale>[
 /// widget test must use this instead of bare `pumpAndSettle()`.
 /// Ends a widget test deterministically.
 ///
-/// Unmounts the pumped tree (so StreamBuilders cancel their Drift watch
-/// subscriptions), elapses fake time (so drift's deferred stream-cache
-/// timer, scheduled on every watch unsubscribe, fires), then closes the
-/// test database. Every widget-test body must call this last: without it,
-/// drift's unsubscribe timer is still pending at the postTest check, the
-/// test fails, and the failure wedges the shard's finalization.
+/// Settles (firing any drift stream-cache timers pending from earlier
+/// unsubscribes, e.g. one-shot reads), shuts the Drift store down, then
+/// settles again to flush the resulting stream-done rebuilds. Closing
+/// before postTest disposes the tree matters: watch unsubscribes during
+/// disposal then no-op instead of scheduling a zero timer that would still
+/// be pending at the postTest check and fail the test. Every widget-test
+/// body must call this last.
 Future<void> finishWidgetTest(WidgetTester tester, TestStack stack) async {
-  // SizedBox.expand (not SizedBox): keep the full test viewport so the dying
-  // tree never relayouts at zero size (which reports overflow errors).
-  await tester.pumpWidget(const SizedBox.expand());
   await pumpSettle(tester);
   await stack.close();
+  await pumpSettle(tester);
 }
 
 Future<void> pumpSettle(WidgetTester tester) async {
