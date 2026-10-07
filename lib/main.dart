@@ -18,9 +18,14 @@ import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/home/home_screen.dart';
+import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/ringing_alarm/ringing_alarm_bridge.dart';
+import 'package:alarmx/features/ringing_alarm/ringing_launch.dart';
+import 'package:alarmx/features/ringing_alarm/ringing_mission_screen.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -49,6 +54,8 @@ Future<void> main() async {
         scheduler: const NativeAlarmSchedulerImpl(),
       ),
       settings: DriftAppSettingsRepository(db.appSettingsDao),
+      missionService: MissionService(DriftMissionRepository(db.missionDao)),
+      ringingBridge: MethodChannelRingingBridge(),
     ),
   );
 }
@@ -64,12 +71,20 @@ class AlarmxApp extends StatefulWidget {
     required this.repository,
     required this.coordinator,
     required this.settings,
+    required this.missionService,
+    this.ringingBridge,
     this.events,
   });
 
   final AlarmRepository repository;
   final AlarmSchedulingCoordinator coordinator;
   final AppSettingsRepository settings;
+  final MissionService missionService;
+
+  /// Ringing bridge override; `null` (tests, plain unit shells) boots Home.
+  /// Production passes the MethodChannel bridge so ring launches route to
+  /// the mission screen.
+  final RingingAlarmBridge? ringingBridge;
 
   /// Event listener override for tests; production uses a live one.
   final NativeAlarmEvents? events;
@@ -86,6 +101,11 @@ class _AlarmxAppState extends State<AlarmxApp> {
   late final NativeAlarmEvents _events = widget.events ?? NativeAlarmEvents();
   late final Future<AppSetting> _settingsFuture =
       widget.settings.getSettings();
+  late final Future<RingingLaunch?>? _launchFuture =
+      widget.ringingBridge?.consumeRingingLaunch();
+
+  /// True once a ringing session finished and the shell returned Home.
+  bool _ringingFinished = false;
 
   /// Session language, set by the Home menu (also persisted best-effort).
   String? _languageOverride;
@@ -179,11 +199,47 @@ class _AlarmxAppState extends State<AlarmxApp> {
             ),
           ),
           themeMode: _themeModeFrom(snapshot.data?.theme),
-          home: HomeScreen(
-            controller: _controller,
-            languageCode: languageCode,
-            onLanguageChanged: _setLanguage,
-          ),
+          home: _ringingFinished
+              ? HomeScreen(
+                  controller: _controller,
+                  languageCode: languageCode,
+                  onLanguageChanged: _setLanguage,
+                )
+              : FutureBuilder<RingingLaunch?>(
+                  future: _launchFuture,
+                  builder: (
+                    BuildContext context,
+                    AsyncSnapshot<RingingLaunch?> snapshot,
+                  ) {
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final RingingLaunch? launch = snapshot.data;
+                    final RingingAlarmBridge? bridge = widget.ringingBridge;
+                    if (launch == null || bridge == null) {
+                      return HomeScreen(
+                        controller: _controller,
+                        languageCode: languageCode,
+                        onLanguageChanged: _setLanguage,
+                      );
+                    }
+                    return RingingMissionScreen(
+                      launch: launch,
+                      missionService: widget.missionService,
+                      bridge: bridge,
+                      onFinished: () {
+                        if (mounted) {
+                          setState(() {
+                            _ringingFinished = true;
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
         );
       },
     );

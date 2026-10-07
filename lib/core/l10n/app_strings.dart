@@ -166,6 +166,7 @@ class AppStrings {
   String get photoTake => text('photoTake');
   String get photoLabel => text('photoLabel');
   String get photoCancelled => text('photoCancelled');
+  String get photoError => text('photoError');
   String get qrInstruction => text('qrInstruction');
   String get qrValueLabel => text('qrValueLabel');
   String get barcodeInstruction => text('barcodeInstruction');
@@ -302,6 +303,7 @@ class AppStrings {
     'photoTake': 'التقط صورة',
     'photoLabel': 'ماذا تصوّر؟ (اختياري)',
     'photoCancelled': 'أُلغي التصوير — حاول مجددًا',
+    'photoError': 'تعذّر استخدام الكاميرا — حاول مجددًا',
     'qrInstruction': 'امسح رمز QR',
     'qrValueLabel': 'قيمة رمز QR المتوقعة',
     'barcodeInstruction': 'امسح الباركود',
@@ -440,6 +442,7 @@ class AppStrings {
     'photoTake': 'Take photo',
     'photoLabel': 'What to photograph (optional)',
     'photoCancelled': 'Photo cancelled — try again',
+    'photoError': 'Could not use the camera — try again',
     'qrInstruction': 'Scan the QR code',
     'qrValueLabel': 'Expected QR value',
     'barcodeInstruction': 'Scan the barcode',
