@@ -163,6 +163,20 @@ const List<Locale> testLocales = <Locale>[
 /// of fake time is a wedged test and must fail with its name instead of
 /// burning the 10-minute default while CI looks hung. Every Phase 3
 /// widget test must use this instead of bare `pumpAndSettle()`.
+/// Ends a widget test deterministically.
+///
+/// Unmounts the pumped tree (so StreamBuilders cancel their Drift watch
+/// subscriptions), elapses fake time (so drift's deferred stream-cache
+/// timer, scheduled on every watch unsubscribe, fires), then closes the
+/// test database. Every widget-test body must call this last: without it,
+/// drift's unsubscribe timer is still pending at the postTest check, the
+/// test fails, and the failure wedges the shard's finalization.
+Future<void> finishWidgetTest(WidgetTester tester, TestStack stack) async {
+  await tester.pumpWidget(const SizedBox());
+  await pumpSettle(tester);
+  await stack.close();
+}
+
 Future<void> pumpSettle(WidgetTester tester) async {
   for (int i = 0; i < 300; i++) {
     await tester.pump(const Duration(milliseconds: 100));
@@ -181,14 +195,6 @@ Future<void> pumpAlarmxApp(
   TestStack stack, {
   String language = AppLanguage.english,
 }) async {
-  // Self-cleaning: unmount the tree while pumps are still legal, then
-  // elapse fake time so drift's deferred stream-cache timer (scheduled on
-  // every watch unsubscribe) fires before the postTest pending-timer check.
-  // Test-scoped tearDowns run before the postTest disposal and checks.
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox());
-    await pumpSettle(tester);
-  });
   await stack.setLanguage(language);
   await tester.pumpWidget(
     AlarmxApp(
@@ -207,14 +213,6 @@ Future<void> pumpHome(
   String language = AppLanguage.english,
   ValueChanged<String>? onLanguageChanged,
 }) async {
-  // Self-cleaning: unmount the tree while pumps are still legal, then
-  // elapse fake time so drift's deferred stream-cache timer (scheduled on
-  // every watch unsubscribe) fires before the postTest pending-timer check.
-  // Test-scoped tearDowns run before the postTest disposal and checks.
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox());
-    await pumpSettle(tester);
-  });
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),

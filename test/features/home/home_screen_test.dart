@@ -32,6 +32,7 @@ void main() {
       expect(find.text(en.homeEmptyTitle), findsOneWidget);
       expect(find.text(en.homeEmptySubtitle), findsOneWidget);
       expect(find.byKey(const Key('empty_add_button')), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('one alarm renders time, label, repeat and state',
@@ -44,6 +45,7 @@ void main() {
       expect(find.text('Daily'), findsOneWidget);
       expect(find.text('On'), findsOneWidget);
       expect(find.text('Not scheduled'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('multiple alarms all render', (WidgetTester tester) async {
@@ -55,6 +57,7 @@ void main() {
       expect(find.text('Second'), findsOneWidget);
       expect(find.textContaining('6:00'), findsOneWidget);
       expect(find.textContaining('10:30'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('disabled alarm renders Off state', (WidgetTester tester) async {
@@ -63,6 +66,7 @@ void main() {
 
       expect(find.text('Off'), findsOneWidget);
       expect(find.text('On'), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('scheduled alarm shows its next trigger',
@@ -74,6 +78,7 @@ void main() {
 
       expect(find.textContaining('Next:'), findsOneWidget);
       expect(find.text('Not scheduled'), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -84,6 +89,7 @@ void main() {
       await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('empty-state button opens the create screen',
@@ -93,6 +99,7 @@ void main() {
       await pumpSettle(tester);
 
       expect(find.text(en.createAlarmTitle), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('tapping an alarm opens the edit screen',
@@ -104,6 +111,7 @@ void main() {
 
       expect(find.text(en.editAlarmTitle), findsOneWidget);
       expect(find.text('Work'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -123,6 +131,7 @@ void main() {
       expect(stored?.enabled, isFalse);
       expect(stored?.nextTriggerAt, isNull);
       expect(stack.scheduler.cancelledIds, contains(id));
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('toggle on enables and schedules',
@@ -138,6 +147,7 @@ void main() {
       final Alarm? stored = await stack.repository.getAlarmById(id);
       expect(stored?.enabled, isTrue);
       expect(stored?.nextTriggerAt, isNotNull);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('toggle failure shows an error message',
@@ -153,6 +163,7 @@ void main() {
       expect(find.text(en.msgNoPermission), findsOneWidget);
       // Desired state is kept even though scheduling failed.
       expect((await stack.repository.getAlarmById(id))?.enabled, isTrue);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -170,6 +181,7 @@ void main() {
 
       expect(await stack.repository.getAlarmById(id), isNotNull);
       expect(find.text('Work'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('confirm cancels the schedule and deletes the row',
@@ -187,6 +199,7 @@ void main() {
       expect(await stack.repository.getAlarmById(id), isNull);
       expect(find.text('Work'), findsNothing);
       expect(find.text(en.homeEmptyTitle), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('delete failure is reported and keeps the row',
@@ -203,6 +216,7 @@ void main() {
 
       expect(find.text(en.msgDeleteFailed), findsOneWidget);
       expect(await stack.repository.getAlarmById(id), isNotNull);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -222,6 +236,7 @@ void main() {
       await pumpSettle(tester);
 
       expect(selected, <String>['ar']);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('Arabic locale renders RTL Arabic UI',
@@ -240,6 +255,7 @@ void main() {
       final Directionality directionality =
           tester.widget(find.byType(Directionality).first);
       expect(directionality.textDirection, TextDirection.rtl);
+      await finishWidgetTest(tester, stack);
     });
   });
 }

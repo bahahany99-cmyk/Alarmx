@@ -30,6 +30,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('add_alarm_fab')), findsOneWidget);
+    await finishWidgetTest(tester, stack);
   });
 
   testWidgets('schema-default Arabic renders an RTL UI',
@@ -48,6 +49,7 @@ void main() {
     final Directionality directionality =
         tester.widget(find.byType(Directionality).first);
     expect(directionality.textDirection, TextDirection.rtl);
+    await finishWidgetTest(tester, stack);
   });
 
   testWidgets('language menu switches and persists the language',
@@ -62,5 +64,6 @@ void main() {
 
     expect(find.text(AppStrings.forCode('en').homeTitle), findsOneWidget);
     expect((await stack.settings.getSettings()).language, 'en');
+    await finishWidgetTest(tester, stack);
   });
 }

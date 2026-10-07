@@ -54,6 +54,7 @@ void main() {
       expect(find.text('5'), findsOneWidget);
       expect(find.text(en.missionNone), findsOneWidget);
       expect(find.byKey(const Key('editor_save_button')), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('label entry is kept', (WidgetTester tester) async {
@@ -64,6 +65,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Gym'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('once shows the date picker button',
@@ -71,6 +73,7 @@ void main() {
       await pumpEditor(tester, stack);
       await tapVisible(tester, find.text(en.repeatOnce));
       expect(find.byKey(const Key('editor_date_button')), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('custom shows weekday chips', (WidgetTester tester) async {
@@ -87,6 +90,7 @@ void main() {
       ]) {
         expect(find.text(day), findsOneWidget);
       }
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -111,6 +115,7 @@ void main() {
       expect(rows.single.repeatType, 'daily');
       expect(rows.single.nextTriggerAt, isNotNull);
       expect(stack.scheduler.scheduledIds, <int>[rows.single.id]);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('custom days are stored as the typed bitmask',
@@ -126,6 +131,7 @@ void main() {
       expect(rows, hasLength(1));
       expect(rows.single.repeatType, 'custom');
       expect(rows.single.repeatDays, 2 | 8);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('custom with no day blocks saving',
@@ -139,6 +145,7 @@ void main() {
       expect(find.text(en.msgValidationDays), findsOneWidget);
       expect(find.byKey(const Key('editor_save_button')), findsOneWidget);
       expect(await alarms(), isEmpty);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('disabled alarm is saved without a schedule',
@@ -158,6 +165,7 @@ void main() {
       final List<Alarm> rows = await alarms();
       expect(rows.single.enabled, isFalse);
       expect(stack.scheduler.scheduledIds, isEmpty);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('vibration off reaches the frozen fire config',
@@ -178,6 +186,7 @@ void main() {
         stack.scheduler.scheduledConfigs.single?.vibrationEnabled,
         isFalse,
       );
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('custom sound URI is stored', (WidgetTester tester) async {
@@ -194,6 +203,7 @@ void main() {
       final Alarm row = (await alarms()).single;
       expect(row.soundUri, 'content://tones/x');
       expect(row.soundType, 'custom');
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('back to default clears the URI', (WidgetTester tester) async {
@@ -206,6 +216,7 @@ void main() {
       await tapVisible(tester, find.text(en.soundDefault));
 
       expect(find.text('content://tones/x'), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('volume change is stored', (WidgetTester tester) async {
@@ -220,6 +231,7 @@ void main() {
 
       final int volume = (await alarms()).single.volume;
       expect(volume, lessThan(80));
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('fade-in toggle is stored', (WidgetTester tester) async {
@@ -235,6 +247,7 @@ void main() {
       await pumpSettle(tester);
 
       expect((await alarms()).single.fadeInEnabled, isTrue);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('snooze off hides options and is stored',
@@ -249,6 +262,7 @@ void main() {
       await pumpSettle(tester);
 
       expect((await alarms()).single.snoozeEnabled, isFalse);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('snooze duration and max count are stored',
@@ -264,6 +278,7 @@ void main() {
       final Alarm row = (await alarms()).single;
       expect(row.snoozeMinutes, 15);
       expect(row.snoozeMaxCount, 5);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('mission section creates no mission rows',
@@ -274,6 +289,7 @@ void main() {
       await pumpSettle(tester);
 
       expect(await missionRowCount(), 0);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -289,6 +305,7 @@ void main() {
       await pumpSettle(tester);
       expect(find.byType(TimePickerDialog), findsNothing);
       expect(find.textContaining('7:00'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('date picker opens for once alarms',
@@ -302,6 +319,7 @@ void main() {
       await tester.tap(find.text('OK'));
       await pumpSettle(tester);
       expect(find.byType(DatePickerDialog), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -317,6 +335,7 @@ void main() {
       expect(find.text('Work'), findsOneWidget);
       expect(find.textContaining('6:15'), findsOneWidget);
       expect(find.text(en.editAlarmTitle), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('modified alarm is updated and rescheduled',
@@ -340,6 +359,7 @@ void main() {
       expect(stack.scheduler.calls, <String>['cancel:$id', 'schedule:$id']);
       expect(stored?.nextTriggerAt,
           stack.scheduler.scheduledTriggers.single);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('disabling edit cancels the schedule',
@@ -362,6 +382,7 @@ void main() {
       expect(stored?.enabled, isFalse);
       expect(stored?.nextTriggerAt, isNull);
       expect(stack.scheduler.cancelledIds, contains(id));
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('missing alarm shows the missing state',
@@ -369,6 +390,7 @@ void main() {
       await pumpEditor(tester, stack, alarmId: 999);
       expect(find.text(en.msgAlarmMissing), findsOneWidget);
       expect(find.byKey(const Key('editor_save_button')), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
   });
 
@@ -389,6 +411,7 @@ void main() {
 
       expect(find.text(en.msgAlarmSaved), findsOneWidget);
       expect(find.text('Round'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('edit flow updates the home tile',
@@ -409,6 +432,7 @@ void main() {
       expect(find.text(en.msgAlarmUpdated), findsOneWidget);
       expect(find.text('After'), findsOneWidget);
       expect(find.text('Before'), findsNothing);
+      await finishWidgetTest(tester, stack);
     });
 
     testWidgets('back without saving creates nothing',
@@ -421,6 +445,7 @@ void main() {
 
       expect(await alarms(), isEmpty);
       expect(find.text(en.homeTitle), findsOneWidget);
+      await finishWidgetTest(tester, stack);
     });
   });
 }
