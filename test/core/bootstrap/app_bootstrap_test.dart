@@ -31,7 +31,10 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel,
             (MethodCall call) async {
-      if (call.method == 'getApplicationDocumentsDirectory') {
+      // driftDatabase() resolves both: the documents dir for the .sqlite
+      // file and the temp dir for sqlite3's temporary files.
+      if (call.method == 'getApplicationDocumentsDirectory' ||
+          call.method == 'getTemporaryDirectory') {
         return tempDir.path;
       }
       return null;
