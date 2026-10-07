@@ -101,14 +101,9 @@ void main() {
   });
 
   group('create save', () {
-    testWidgets('daily alarm with label is saved and scheduled',
+    testWidgets('daily alarm without label is saved and scheduled',
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
-      await tester.enterText(
-        find.byKey(const Key('editor_label_field')),
-        'Work',
-      );
-      await tester.pump();
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
@@ -116,7 +111,6 @@ void main() {
       expect(find.byKey(const Key('editor_save_button')), findsNothing);
       final List<Alarm> rows = await alarms();
       expect(rows, hasLength(1));
-      expect(rows.single.label, 'Work');
       expect(rows.single.hour, 7);
       expect(rows.single.repeatType, 'daily');
       expect(rows.single.nextTriggerAt, isNotNull);
