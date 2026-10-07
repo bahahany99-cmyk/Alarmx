@@ -43,9 +43,9 @@ jobs:
         # harness stall instead. Reverted after diagnosis.
         run: |
           set -o pipefail
-          timeout 420 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
+          timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
           code=${code:-0}
-          echo "WALL-BOUND EXIT: $code (124 = still running at 7 min)"
+          echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
           python3 - <<'PY' 2>&1 | tee /tmp/test.log
           import json
           starts, dones = {}, 0
