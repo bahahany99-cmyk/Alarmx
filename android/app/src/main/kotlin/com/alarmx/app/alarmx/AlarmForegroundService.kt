@@ -24,13 +24,17 @@ import androidx.core.app.NotificationCompat
  *
  * Pipeline: `AlarmManager` → [AlarmReceiver] → (`ContextCompat.startForegroundService`)
  * → this service → `startForeground()` → ongoing ringing notification (with a
- * full-screen intent opening [FullScreenAlarmActivity]) + default alarm
- * ringtone + repeating vibration.
+ * full-screen intent opening the Flutter mission screen via [MainActivity]) +
+ * default alarm ringtone + repeating vibration.
  *
- * Stopping: the "Stop alarm" notification action sends [ACTION_STOP] back to this
- * service, which stops the ringtone/vibration, leaves the foreground state (removing
- * the notification) and stops itself. No Flutter UI needs to be open. [onDestroy]
- * runs the same cleanup, so every path is leak-free and idempotent.
+ * Stopping: the Flutter mission screen stops the ring through the
+ * `stopRingingAlarm` channel method, which sends [ACTION_STOP] back to this
+ * service; the service stops the ringtone/vibration, leaves the foreground
+ * state (removing the notification) and stops itself. There is deliberately
+ * no notification stop action: it would dismiss the ring without solving the
+ * required missions. Tapping the notification opens the mission screen
+ * instead. [onDestroy] runs the same cleanup, so every path is leak-free
+ * and idempotent.
  *
  * Fire config: a start may carry [EXTRA_LABEL] (shown in the notification,
  * default text otherwise) and [EXTRA_VIBRATION_ENABLED] (default true).
@@ -71,7 +75,6 @@ class AlarmForegroundService : Service() {
         private const val RINGING_NOTIFICATION_ID = 2000
 
         private const val REQUEST_CODE_CONTENT = 10
-        private const val REQUEST_CODE_STOP = 11
 
         /**
          * Repeating vibration pattern: start immediately, vibrate 1000ms,
@@ -171,21 +174,13 @@ class AlarmForegroundService : Service() {
             getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         ensureRingingChannel(notificationManager)
 
+        // Both entries cold-boot MainActivity (NEW_TASK + CLEAR_TASK) with
+        // the ring identity, so Dart always consumes the launch at startup
+        // through the consume-once bridge and boots into the mission screen.
         val contentIntent = PendingIntent.getActivity(
             this,
             REQUEST_CODE_CONTENT,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra(EXTRA_ALARM_ID, alarmId)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val stopIntent = PendingIntent.getService(
-            this,
-            REQUEST_CODE_STOP,
-            Intent(this, AlarmForegroundService::class.java).apply {
-                action = ACTION_STOP
-            },
+            ringActivityIntent(alarmId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         // Full-screen alarm surface: launched by the system from this
@@ -207,35 +202,40 @@ class AlarmForegroundService : Service() {
             // Vibrator below are the actual alarm output.
             .setDefaults(0)
             .setContentIntent(contentIntent)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Stop alarm",
-                stopIntent,
-            )
             .build()
     }
 
     /**
-     * Builds the full-screen intent opening [FullScreenAlarmActivity] for
-     * this ring. The requestCode is the alarm id (same identity as the
-     * firing PendingIntent; the activity component keeps the two intents
-     * distinct). The frozen fire extras travel along so the screen shows
-     * the same alarm event the service is ringing; legacy test rings
-     * carry the id only.
+     * Ring intent opening [MainActivity] for this ring, shared by the
+     * notification tap target and the full-screen intent. Always cold-boots
+     * the activity (NEW_TASK + CLEAR_TASK) so a stale live engine can never
+     * sit on Home while the phone rings; Dart consumes the launch at
+     * startup and boots into the mission screen. The frozen fire extras
+     * travel along so the screen shows the same alarm event the service is
+     * ringing; legacy test rings carry the id only.
      */
-    private fun buildFullScreenPendingIntent(alarmId: Int): PendingIntent {
-        val intent = Intent(this, FullScreenAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(FullScreenAlarmActivity.EXTRA_ALARM_ID, alarmId)
-            ringLabel?.let { putExtra(FullScreenAlarmActivity.EXTRA_LABEL, it) }
+    private fun ringActivityIntent(alarmId: Int): Intent {
+        return Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(MainActivity.EXTRA_RINGING, true)
+            putExtra(MainActivity.EXTRA_ALARM_ID, alarmId)
+            ringLabel?.let { putExtra(MainActivity.EXTRA_LABEL, it) }
             ringTriggerAtMillis?.let {
-                putExtra(FullScreenAlarmActivity.EXTRA_TRIGGER_AT_MILLIS, it)
+                putExtra(MainActivity.EXTRA_TRIGGER_AT_MILLIS, it)
             }
         }
+    }
+
+    /**
+     * Builds the full-screen intent for this ring (see [ringActivityIntent]).
+     * The requestCode is the alarm id (same identity as the firing
+     * PendingIntent; the activity component keeps the two intents distinct).
+     */
+    private fun buildFullScreenPendingIntent(alarmId: Int): PendingIntent {
         return PendingIntent.getActivity(
             this,
             alarmId,
-            intent,
+            ringActivityIntent(alarmId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
@@ -330,8 +330,6 @@ class AlarmForegroundService : Service() {
      * paths and [onDestroy]. When the call ends an actual ring of a
      * persisted alarm it also fires the one-shot post-fire handoff
      * ([MainActivity.notifyAlarmStopped]); duplicate calls report nothing.
-     * Any ended ring additionally sends the in-process stopped broadcast so
-     * an open [FullScreenAlarmActivity] closes itself.
      */
     private fun stopRinging() {
         val wasRinging = isRinging
@@ -366,18 +364,6 @@ class AlarmForegroundService : Service() {
         }
         if (!wasRinging) {
             return
-        }
-        // The ring ended: tell any open alarm screen to close (all rings,
-        // including legacy test rings, which also show the screen).
-        try {
-            sendBroadcast(
-                Intent(FullScreenAlarmActivity.ACTION_ALARM_STOPPED).apply {
-                    `package` = packageName
-                    putExtra(FullScreenAlarmActivity.EXTRA_ALARM_ID, stoppedAlarmId)
-                },
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "Could not send alarm-stopped broadcast.", t)
         }
         // Post-fire handoff, exactly once per completed ring: the identity
         // was cleared above, so duplicate stop calls find wasRinging false.

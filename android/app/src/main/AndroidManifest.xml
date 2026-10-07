@@ -72,19 +72,6 @@
         </activity>
 
         <!--
-          Roadmap Phase 2 full-screen ringing surface, launched only by our
-          own notification full-screen intent (not exported). singleTop so a
-          second launch while open updates instead of duplicating; the screen
-          shows itself over the lock screen and turns the screen on from
-          code (API-branched for minSdk 26), never bypassing the lock.
-        -->
-        <activity
-            android:name=".FullScreenAlarmActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
-
-        <!--
           Receives the broadcast fired by AlarmManager when a scheduled
           alarm goes off. Not exported because it must only be triggerable
           by our own PendingIntents.

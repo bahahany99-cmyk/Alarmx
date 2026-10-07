@@ -20,6 +20,11 @@ import io.flutter.plugin.common.MethodChannel
  *       plus for persisted alarms "label": String? and "vibrationEnabled": Boolean }`
  *   - `cancelAlarm`         args: `{ "alarmId": Int }`
  *   - `canScheduleExactAlarms`  args: `{}`
+ *   - `getRingingLaunch`  args: `{}`: the pending Flutter ring launch
+ *     `{alarmId, label?, triggerAtMillis?}`, consumed exactly once, or
+ *     null for a normal start.
+ *   - `stopRingingAlarm`  args: `{ "alarmId": Int }`: stops the ring
+ *     through the service `ACTION_STOP` path (idempotent).
  *
  * A schedule call carrying a fire payload (label and/or vibration key
  * present) is a real persisted alarm: its config is frozen into the
@@ -98,6 +103,35 @@ class AlarmSchedulerChannelHandler(
                         true
                     }
                     result.success(can)
+                }
+
+                "getRingingLaunch" -> {
+                    result.success(MainActivity.consumeRingingLaunch())
+                }
+
+                "stopRingingAlarm" -> {
+                    val alarmId = call.argument<Int>("alarmId")
+                    if (alarmId == null) {
+                        result.error(
+                            "INVALID_ARGS",
+                            "stopRingingAlarm requires alarmId (Int).",
+                            null,
+                        )
+                        return@handle
+                    }
+                    try {
+                        context.startService(
+                            Intent(context, AlarmForegroundService::class.java).apply {
+                                action = AlarmForegroundService.ACTION_STOP
+                            },
+                        )
+                    } catch (t: Throwable) {
+                        Log.w("AlarmX", "stopRingingAlarm failed for id: $alarmId.", t)
+                        result.error("NATIVE_ERROR", t.message, null)
+                        return@handle
+                    }
+                    Log.d("AlarmX", "Stop sent to ringing service for id: $alarmId.")
+                    result.success(null)
                 }
 
                 else -> result.notImplemented()
