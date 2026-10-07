@@ -15,10 +15,6 @@ void main() {
   });
 
   tearDown(() async {
-    // Dispose widgets FIRST (cancels Drift watch subscriptions), then close
-    // the database. Deterministic per-test cleanup: no leaked connections
-    // accumulate across the suite.
-    await disposeLastTree();
     await stack.close();
   });
 

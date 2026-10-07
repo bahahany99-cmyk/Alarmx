@@ -37,14 +37,52 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.log
 
       - name: Run tests
-        # NOTE: shards are capped at 2. The Phase 3 widget tests each pump a
-        # full MaterialApp over a real in-memory Drift stack; at 4-way
-        # parallelism the full suite wedges flakily mid-run. Widget tests
-        # also dispose their tree and close their database in tearDown so no
-        # live connections accumulate across the suite.
+        # TEMP DIAGNOSTIC (Phase 3 hang hunt, round 3): JSON reporter +
+        # 150s wall bound. Captures PHASE prints from the wedging test to
+        # pin the stuck phase. Reverted after diagnosis.
         run: |
           set -o pipefail
-          flutter test --concurrency=2 2>&1 | tee /tmp/test.log
+          timeout 150 flutter test --concurrency=2 -r json > /tmp/json.log 2>&1 || code=$?
+          code=${code:-0}
+          echo "WALL-BOUND EXIT: $code (124 = still running at 150s)"
+          python3 - <<'PY' 2>&1 | tee /tmp/test.log
+          import json
+          starts, dones, phases = {}, 0, []
+          try:
+              lines = open('/tmp/json.log', errors='replace').read().splitlines()
+          except OSError:
+              lines = []
+          print(f'json lines: {len(lines)}')
+          for line in lines:
+              line = line.strip()
+              if not line.startswith('{'):
+                  if 'PHASE daily-label' in line:
+                      phases.append(line[-120:])
+                  continue
+              try:
+                  e = json.loads(line)
+              except ValueError:
+                  continue
+              t = e.get('type')
+              if t == 'testStart':
+                  test = e.get('test', {})
+                  starts[test.get('id')] = (test.get('name'), test.get('url', ''))
+              elif t == 'testDone':
+                  dones += 1
+                  starts.pop(e.get('testID'), None)
+              elif t == 'print':
+                  msg = str(e.get('message', ''))
+                  if 'PHASE daily-label' in msg:
+                      phases.append(msg.strip()[-120:])
+          print(f'tests done: {dones}')
+          print(f'tests started-but-unfinished: {len(starts)}')
+          for tid, (name, url) in list(starts.items())[:15]:
+              print(f'  UNFINISHED: {name}')
+          print(f'phase prints captured: {len(phases)}')
+          for ph in phases[-12:]:
+              print(f'  PHASE: {ph}')
+          PY
+          test "$code" -eq 0
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
       - name: Surface logs on failure
@@ -52,22 +90,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          import subprocess
-
-          # TEMP DIAGNOSTIC: pull failing-test lines out of the full log.
-          probe = subprocess.run(
-              ['grep', '-m', '8', '-A', '6',
-               'EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK', '/tmp/test.log'],
-              capture_output=True, text=True, errors='replace')
-          if probe.stdout.strip():
-              msg = probe.stdout.strip().replace('%', '%25').replace('\n', '%0A')
-              print(f'::error title=fail-lines::{msg[:4000]}')
-          probe2 = subprocess.run(
-              ['grep', '-m', '50', '❌', '/tmp/test.log'],
-              capture_output=True, text=True, errors='replace')
-          if probe2.stdout.strip():
-              msg2 = probe2.stdout.strip().replace('%', '%25').replace('\n', '%0A')
-              print(f'::error title=fail-names::{msg2[:4000]}')
 
           def read_tail(path, count=120):
               try:

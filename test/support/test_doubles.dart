@@ -160,26 +160,6 @@ const List<Locale> testLocales = <Locale>[
 /// of fake time is a wedged test and must fail with its name instead of
 /// burning the 10-minute default while CI looks hung. Every Phase 3
 /// widget test must use this instead of bare `pumpAndSettle()`.
-/// The tester from the most recent pump helper call.
-///
-/// Lets file-level tearDowns dispose the widget tree (cancelling stream
-/// subscriptions) before closing the test database, without touching every
-/// test body. Set by [pumpHome], [pumpEditor], and [pumpAlarmxApp].
-WidgetTester? currentTesterForTeardown;
-
-/// Disposes the last pumped widget tree, if any.
-///
-/// Replaces the test root with an empty box so `StreamBuilder`s cancel their
-/// Drift watch subscriptions *before* the test database is closed.
-Future<void> disposeLastTree() async {
-  final WidgetTester? tester = currentTesterForTeardown;
-  currentTesterForTeardown = null;
-  if (tester != null) {
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump();
-  }
-}
-
 Future<void> pumpSettle(WidgetTester tester) async {
   for (int i = 0; i < 300; i++) {
     await tester.pump(const Duration(milliseconds: 100));
@@ -198,7 +178,6 @@ Future<void> pumpAlarmxApp(
   TestStack stack, {
   String language = AppLanguage.english,
 }) async {
-  currentTesterForTeardown = tester;
   await stack.setLanguage(language);
   await tester.pumpWidget(
     AlarmxApp(
@@ -217,7 +196,6 @@ Future<void> pumpHome(
   String language = AppLanguage.english,
   ValueChanged<String>? onLanguageChanged,
 }) async {
-  currentTesterForTeardown = tester;
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),
@@ -244,7 +222,6 @@ Future<void> pumpEditor(
   String language = AppLanguage.english,
   int? alarmId,
 }) async {
-  currentTesterForTeardown = tester;
   await tester.pumpWidget(
     MaterialApp(
       locale: Locale(language),
