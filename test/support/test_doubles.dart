@@ -237,6 +237,8 @@ Future<void> pumpHome(
         missionService: stack.missions,
         pinService: stack.pinService,
         settings: stack.settings,
+        history: stack.history,
+        alarmRepository: stack.repository,
         languageCode: language,
         onLanguageChanged: onLanguageChanged ?? (_) {},
       ),

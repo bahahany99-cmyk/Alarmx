@@ -231,6 +231,19 @@ class AppStrings {
   String get emergencyHold => text('emergencyHold');
   String get emergencyUsePin => text('emergencyUsePin');
   String get emergencyCaption => text('emergencyCaption');
+  String get historyTitle => text('historyTitle');
+  String get historyEmptyTitle => text('historyEmptyTitle');
+  String get historyEmptySubtitle => text('historyEmptySubtitle');
+  String get historyStatusSuccess => text('historyStatusSuccess');
+  String get historyStatusFailed => text('historyStatusFailed');
+  String get historyStatusEmergency => text('historyStatusEmergency');
+  String get historyStatusOngoing => text('historyStatusOngoing');
+  String get historyStart => text('historyStart');
+  String get historyStop => text('historyStop');
+  String get historyResult => text('historyResult');
+  String get historyAttempts => text('historyAttempts');
+  String get historySnoozes => text('historySnoozes');
+  String get historyUnknownAlarm => text('historyUnknownAlarm');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -400,6 +413,19 @@ class AppStrings {
     'emergencyHold': 'اضغط مطولًا 10 ثوانٍ للإيقاف',
     'emergencyUsePin': 'استخدام الرقم السري',
     'emergencyCaption': 'يوقف هذا الرنين فقط — يبقى المنبه والوضع الصارم مفعّلين.',
+    'historyTitle': 'سجل المنبهات',
+    'historyEmptyTitle': 'لا يوجد سجل بعد',
+    'historyEmptySubtitle': 'ستظهر هنا المنبهات التي رنّت',
+    'historyStatusSuccess': 'استيقاظ',
+    'historyStatusFailed': 'لم يتم إيقافه',
+    'historyStatusEmergency': 'إيقاف طارئ',
+    'historyStatusOngoing': 'جارٍ',
+    'historyStart': 'البدء',
+    'historyStop': 'الإيقاف',
+    'historyResult': 'النتيجة',
+    'historyAttempts': 'المحاولات',
+    'historySnoozes': 'الغفوات',
+    'historyUnknownAlarm': 'منبه محذوف',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -571,6 +597,19 @@ class AppStrings {
     'emergencyHold': 'Hold 10 seconds to force-stop',
     'emergencyUsePin': 'Use PIN instead',
     'emergencyCaption': 'Stops this ring only — the alarm and Strict Mode stay on.',
+    'historyTitle': 'Alarm history',
+    'historyEmptyTitle': 'No history yet',
+    'historyEmptySubtitle': 'Rings will appear here',
+    'historyStatusSuccess': 'Wake-up',
+    'historyStatusFailed': 'Not stopped',
+    'historyStatusEmergency': 'Emergency Stop',
+    'historyStatusOngoing': 'Ongoing',
+    'historyStart': 'Started',
+    'historyStop': 'Stopped',
+    'historyResult': 'Result',
+    'historyAttempts': 'Attempts',
+    'historySnoozes': 'Snoozes',
+    'historyUnknownAlarm': 'Deleted alarm',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };

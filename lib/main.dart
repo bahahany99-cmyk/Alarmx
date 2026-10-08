@@ -211,6 +211,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
                   missionService: widget.missionService,
                   pinService: _pinService,
                   settings: widget.settings,
+                  history: widget.history,
+                  alarmRepository: widget.repository,
                   languageCode: languageCode,
                   onLanguageChanged: _setLanguage,
                 )
@@ -234,6 +236,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
                         missionService: widget.missionService,
                         pinService: _pinService,
                         settings: widget.settings,
+                        history: widget.history,
+                        alarmRepository: widget.repository,
                         languageCode: languageCode,
                         onLanguageChanged: _setLanguage,
                       );

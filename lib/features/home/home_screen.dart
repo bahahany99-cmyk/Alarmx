@@ -14,10 +14,13 @@
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/repositories/alarm_history_repository.dart';
+import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/history/history_screen.dart';
 import 'package:alarmx/features/home/widgets/alarm_list_tile.dart';
 import 'package:alarmx/features/security/pin_prompt.dart';
 import 'package:alarmx/features/security/security_screen.dart';
@@ -31,6 +34,8 @@ class HomeScreen extends StatefulWidget {
     required this.missionService,
     required this.pinService,
     required this.settings,
+    required this.history,
+    required this.alarmRepository,
     required this.languageCode,
     required this.onLanguageChanged,
   });
@@ -46,6 +51,12 @@ class HomeScreen extends StatefulWidget {
 
   /// Settings for the Security screen and the editor defaults.
   final AppSettingsRepository settings;
+
+  /// History rows for the History screen.
+  final AlarmHistoryRepository history;
+
+  /// Alarms for History-screen labels (missing alarms stay readable).
+  final AlarmRepository alarmRepository;
 
   /// Active UI language code ('ar'/'en'), for the menu checkmark.
   final String languageCode;
@@ -112,6 +123,17 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       _busyToggleIds.remove(alarm.id);
     }
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HistoryScreen(
+          history: widget.history,
+          alarms: widget.alarmRepository,
+        ),
+      ),
+    );
   }
 
   void _openSecurity() {
@@ -206,6 +228,12 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(strings.homeTitle),
         actions: <Widget>[
+          IconButton(
+            key: const Key('home_history_button'),
+            icon: const Icon(Icons.history),
+            tooltip: strings.historyTitle,
+            onPressed: _openHistory,
+          ),
           IconButton(
             key: const Key('home_security_button'),
             icon: const Icon(Icons.security),
