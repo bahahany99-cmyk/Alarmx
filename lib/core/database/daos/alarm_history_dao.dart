@@ -42,4 +42,14 @@ class AlarmHistoryDao extends DatabaseAccessor<AppDatabase>
           ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
         .get();
   }
+
+  /// Watches every history row in the table, newest first (Phase 6).
+  ///
+  /// Manual query (no codegen): the History/Statistics screens stay
+  /// reactive to inserts/updates without polling.
+  Stream<List<AlarmHistoryData>> watchAllHistory() {
+    return (select(alarmHistory)
+          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
+        .watch();
+  }
 }

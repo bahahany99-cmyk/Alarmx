@@ -28,6 +28,9 @@ abstract class AlarmHistoryRepository {
 
   /// Every history row in the table, newest first.
   Future<List<AlarmHistoryData>> getAllHistory();
+
+  /// Reactive stream of every history row in the table, newest first.
+  Stream<List<AlarmHistoryData>> watchAllHistory();
 }
 
 /// [AlarmHistoryRepository] backed by Drift.
@@ -53,4 +56,8 @@ class DriftAlarmHistoryRepository implements AlarmHistoryRepository {
 
   @override
   Future<List<AlarmHistoryData>> getAllHistory() => _dao.getAllHistory();
+
+  @override
+  Stream<List<AlarmHistoryData>> watchAllHistory() =>
+      _dao.watchAllHistory();
 }
