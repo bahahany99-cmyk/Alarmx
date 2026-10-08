@@ -681,6 +681,8 @@ void main() {
           (await alarms.getAlarmById(id))!.nextTriggerAt;
       expect(stored, isNotNull);
       // The alarm fired and the service is ringing while the app starts.
+      // (scheduleAlarm cancels before scheduling; clear that setup noise.)
+      scheduler.cancelledIds.clear();
       scheduler.ringingIds.add(id);
 
       final ReconciliationReport report = await coordinator.reconcileSchedules(
@@ -700,6 +702,8 @@ void main() {
     test('does not reschedule a ringing recurring alarm mid-ring', () async {
       final int id = await insertAlarm();
       await coordinator.scheduleAlarm(id, now: monday);
+      // scheduleAlarm cancels before scheduling; clear that setup noise.
+      scheduler.cancelledIds.clear();
       scheduler.ringingIds.add(id);
 
       final ReconciliationReport report = await coordinator.reconcileSchedules(
