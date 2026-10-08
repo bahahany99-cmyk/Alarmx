@@ -63,9 +63,9 @@ Future<ReliabilityData> readReliability({
   }
   final PermissionSnapshot snapshot =
       PermissionSnapshot.fromSystem(native: native, camera: camera);
-  final List<Alarm> allAlarms = await alarms.watchAlarms().first;
-  final List<Alarm> enabled =
-      allAlarms.where((Alarm alarm) => alarm.enabled).toList();
+  // One-shot read: never `.first` on a watch stream (it does not complete
+  // under fake async and would hang the loading state forever).
+  final List<Alarm> enabled = await alarms.getEnabledAlarms();
   bool relevant = false;
   for (final Alarm alarm in enabled) {
     final AlarmMissions alarmMissions =
