@@ -20,6 +20,8 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
   Object? scheduleError;
   Object? cancelError;
   Object? checkError;
+  Object? isRingingError;
+  final Set<int> ringingIds = <int>{};
   final List<String> calls = <String>[];
   final List<int> scheduledIds = <int>[];
   final List<DateTime> scheduledTriggers = <DateTime>[];
@@ -56,6 +58,14 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
       throw checkError!;
     }
     return canSchedule;
+  }
+
+  @override
+  Future<bool> isRingingAlarm({required int alarmId}) async {
+    if (isRingingError != null) {
+      throw isRingingError!;
+    }
+    return ringingIds.contains(alarmId);
   }
 }
 
@@ -658,6 +668,81 @@ void main() {
       expect(report.unschedulable, 1);
       expect(scheduler.scheduledIds.length, 1);
       expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+    });
+
+    test('leaves a ringing one-time alarm untouched (startup never kills a ring)',
+        () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+      );
+      await coordinator.scheduleAlarm(id, now: monday);
+      final DateTime? stored =
+          (await alarms.getAlarmById(id))!.nextTriggerAt;
+      expect(stored, isNotNull);
+      // The alarm fired and the service is ringing while the app starts.
+      scheduler.ringingIds.add(id);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.processed, 1);
+      expect(report.scheduled, 1);
+      expect(report.unschedulable, 0);
+      // No cancel (which would stop the service) and no reschedule.
+      expect(scheduler.cancelledIds, isEmpty);
+      expect(scheduler.scheduledIds.length, 1);
+      // Row untouched: the post-fire stop handoff completes it after stop.
+      expect((await alarms.getAlarmById(id))!.nextTriggerAt, stored);
+    });
+
+    test('does not reschedule a ringing recurring alarm mid-ring', () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      scheduler.ringingIds.add(id);
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.scheduled, 1);
+      expect(scheduler.cancelledIds, isEmpty);
+      expect(scheduler.scheduledTriggers.length, 1);
+    });
+
+    test('failed ringing query counts failed without touching native state',
+        () async {
+      final int id = await insertAlarm();
+      await coordinator.scheduleAlarm(id, now: monday);
+      scheduler.calls.clear();
+      scheduler.isRingingError = StateError('bridge down');
+
+      final ReconciliationReport report =
+          await coordinator.reconcileSchedules(now: monday);
+
+      expect(report.processed, 1);
+      expect(report.failed, 1);
+      expect(report.scheduled, 0);
+      expect(scheduler.calls, isEmpty);
+    });
+
+    test('ringing guard is selective: other alarms still reconcile', () async {
+      final int ringing = await insertAlarm();
+      final int idle = await insertAlarm();
+      await coordinator.scheduleAlarm(ringing, now: monday);
+      await coordinator.scheduleAlarm(idle, now: monday);
+      scheduler.ringingIds.add(ringing);
+      scheduler.cancelledIds.clear();
+
+      final ReconciliationReport report = await coordinator.reconcileSchedules(
+        now: DateTime(2026, 10, 7, 10, 0),
+      );
+
+      expect(report.processed, 2);
+      expect(report.scheduled, 2);
+      expect(report.failed, 0);
+      expect(scheduler.cancelledIds, <int>[idle]);
     });
 
     test('custom alarm with past trigger chains to next selected day',

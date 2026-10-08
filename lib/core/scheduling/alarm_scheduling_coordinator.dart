@@ -422,14 +422,17 @@ class AlarmSchedulingCoordinator {
   /// Reconciles every stored alarm with the OS after boot (or any event
   /// that may have wiped native schedules).
   ///
-  /// Flow per alarm: enabled -> [scheduleAlarm] (recomputes the correct
-  /// trigger strictly after [now], re-issues the native schedule through
-  /// the alarm's own PendingIntent slot, persists it); disabled ->
-  /// [cancelAlarm] (removes any stale native schedule/ledger entry, clears
-  /// the trigger). Re-issuing an already-correct trigger is the repair,
-  /// not a duplicate: the slot and ledger token are overwritten in place.
-  /// Each alarm is isolated: unexpected errors are counted in the report
-  /// and the pass continues with the rest.
+  /// Flow per alarm: disabled -> [cancelAlarm] (removes any stale native
+  /// schedule/ledger entry, clears the trigger); currently ringing ->
+  /// untouched and counted as scheduled (the ring is the live schedule,
+  /// and the post-fire stop handoff completes it after the user stops it);
+  /// otherwise enabled -> [scheduleAlarm] (recomputes the correct trigger
+  /// strictly after [now], re-issues the native schedule through the
+  /// alarm's own PendingIntent slot, persists it). Re-issuing an
+  /// already-correct trigger is the repair, not a duplicate: the slot and
+  /// ledger token are overwritten in place. Each alarm is isolated:
+  /// unexpected errors are counted in the report and the pass continues
+  /// with the rest.
   ///
   /// [now] defaults to the current local time and exists so tests can pin
   /// time deterministically. Only a total failure to load the alarm list
@@ -450,6 +453,25 @@ class AlarmSchedulingCoordinator {
         } catch (_) {
           failed++;
         }
+        continue;
+      }
+      // A ring in progress IS the live schedule: cancelling the native
+      // schedule underneath it would stop the service mid-ring (this is why
+      // opening the app used to silence a ringing alarm — startup
+      // reconciliation re-scheduled the just-fired trigger). Leave it
+      // untouched and count it as scheduled; the post-fire stop handoff
+      // completes or chains the alarm after the user stops the ring.
+      // A failed ringing query is counted, not retried: touching
+      // unverified native state could kill a ring we cannot see.
+      final bool ringing;
+      try {
+        ringing = await _scheduler.isRingingAlarm(alarmId: alarm.id);
+      } catch (_) {
+        failed++;
+        continue;
+      }
+      if (ringing) {
+        scheduled++;
         continue;
       }
       final AlarmScheduleResult? preserved =

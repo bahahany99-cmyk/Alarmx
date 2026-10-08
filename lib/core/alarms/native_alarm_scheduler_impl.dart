@@ -10,6 +10,7 @@
 //       "vibrationEnabled": bool from [AlarmFireConfig] }
 //   - "cancelAlarm"         args: { "alarmId": int }
 //   - "canScheduleExactAlarms"  args: {}
+//   - "isRingingAlarm"      args: { "alarmId": int } -> bool
 //
 // The `triggerAt` DateTime is serialised to milliseconds since epoch so the
 // native side receives a Long (millisecond resolution is what AlarmManager
@@ -59,6 +60,15 @@ class NativeAlarmSchedulerImpl implements NativeAlarmScheduler {
   Future<bool> canScheduleExactAlarms() async {
     final result =
         await _channel.invokeMethod<bool>('canScheduleExactAlarms');
+    return result ?? false;
+  }
+
+  @override
+  Future<bool> isRingingAlarm({required int alarmId}) async {
+    final result = await _channel.invokeMethod<bool>(
+      'isRingingAlarm',
+      <String, Object?>{'alarmId': alarmId},
+    );
     return result ?? false;
   }
 }

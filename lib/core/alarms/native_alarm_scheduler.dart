@@ -38,4 +38,13 @@ abstract class NativeAlarmScheduler {
   /// On Android < 12 this is always `true`; on Android 12+ it reflects
   /// whether the user has granted the `SCHEDULE_EXACT_ALARM` permission.
   Future<bool> canScheduleExactAlarms();
+
+  /// Returns `true` when the native ringing service is currently ringing
+  /// the alarm with [alarmId].
+  ///
+  /// Read-only: it never starts or stops anything. Reconciliation uses it
+  /// to leave an in-progress ring alone (cancelling the native schedule
+  /// would stop the ring); the post-fire stop handoff still completes or
+  /// chains the alarm after the user stops the ring.
+  Future<bool> isRingingAlarm({required int alarmId});
 }

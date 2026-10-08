@@ -25,7 +25,10 @@ import androidx.core.app.NotificationCompat
  * Pipeline: `AlarmManager` → [AlarmReceiver] → (`ContextCompat.startForegroundService`)
  * → this service → `startForeground()` → ongoing ringing notification (with a
  * full-screen intent opening the Flutter mission screen via [MainActivity]) +
- * default alarm ringtone + repeating vibration.
+ * default alarm ringtone + repeating vibration. On Android 14+ the
+ * full-screen launch is attached only when the full-screen-intent permission
+ * is granted; otherwise the same high-priority notification still posts and
+ * tapping it opens the mission screen.
  *
  * Stopping: the Flutter mission screen stops the ring through the
  * `stopRingingAlarm` channel method, which sends [ACTION_STOP] back to this
@@ -92,6 +95,17 @@ class AlarmForegroundService : Service() {
          * against a leaked lock if the process is killed abnormally.
          */
         private const val WAKE_LOCK_TIMEOUT_MS = 10L * 60L * 1000L
+
+        /**
+         * Id of the alarm currently ringing, or null when the service is
+         * idle. Written by [startRinging]/[stopRinging] and read by the
+         * scheduler channel's `isRingingAlarm` query, so Dart
+         * reconciliation can leave an in-progress ring alone instead of
+         * cancelling the native schedule underneath it.
+         */
+        @Volatile
+        var ringingAlarmId: Int? = null
+            private set
     }
 
     @Volatile
@@ -167,6 +181,7 @@ class AlarmForegroundService : Service() {
         // From here the service is safely in the foreground; sound, vibration
         // and the wake lock are each best-effort and independent.
         isRinging = true
+        ringingAlarmId = alarmId
         acquireWakeLock()
         startRingtone()
         startVibration()
@@ -188,15 +203,26 @@ class AlarmForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         // Full-screen alarm surface: launched by the system from this
-        // notification when the alarm fires (suppressed only while the
-        // device already shows something more urgent).
-        val fullScreenIntent = buildFullScreenPendingIntent(alarmId)
+        // notification when the alarm fires. Android 14+ gates this on the
+        // full-screen-intent permission, and some OEM skins suppress the
+        // auto-launch even then; when it is unavailable the ring still
+        // posts this high-priority ongoing notification and a tap opens
+        // the same mission screen.
+        val fullScreenAllowed = canUseFullScreenIntent(notificationManager)
+        val fullScreenIntent =
+            if (fullScreenAllowed) buildFullScreenPendingIntent(alarmId) else null
 
         return NotificationCompat.Builder(this, RINGING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("AlarmX")
             .setContentText(ringLabel?.takeIf { it.isNotBlank() } ?: "Alarm is ringing")
-            .setFullScreenIntent(fullScreenIntent, true)
+            .apply {
+                if (fullScreenIntent != null) {
+                    setFullScreenIntent(fullScreenIntent, true)
+                } else {
+                    Log.w(TAG, "Full-screen launch unavailable; ringing behind a tap-to-open notification.")
+                }
+            }
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
@@ -242,6 +268,24 @@ class AlarmForegroundService : Service() {
             ringActivityIntent(alarmId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /**
+     * Whether the system will honor a full-screen intent right now. Below
+     * Android 14 (API 34) there is no such permission and the intent is
+     * always attempted; on 14+ the check reflects the user's grant state.
+     * A failed check fails open: attempting the intent is harmless.
+     */
+    private fun canUseFullScreenIntent(notificationManager: NotificationManager): Boolean {
+        if (Build.VERSION.SDK_INT < 34) {
+            return true
+        }
+        return try {
+            notificationManager.canUseFullScreenIntent()
+        } catch (e: Exception) {
+            Log.w(TAG, "Full-screen permission check failed; attempting full-screen.", e)
+            true
+        }
     }
 
     private fun ensureRingingChannel(notificationManager: NotificationManager) {
@@ -342,6 +386,7 @@ class AlarmForegroundService : Service() {
         isRinging = false
         ringAlarmId = -1
         ringTriggerAtMillis = null
+        ringingAlarmId = null
         try {
             ringtone?.takeIf { it.isPlaying }?.stop()
         } catch (e: Exception) {

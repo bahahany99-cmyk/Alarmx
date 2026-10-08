@@ -47,6 +47,8 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
   Object? scheduleError;
   Object? cancelError;
   Object? checkError;
+  Object? isRingingError;
+  final Set<int> ringingIds = <int>{};
   final List<String> calls = <String>[];
   final List<int> scheduledIds = <int>[];
   final List<DateTime> scheduledTriggers = <DateTime>[];
@@ -83,6 +85,14 @@ class FakeNativeAlarmScheduler implements NativeAlarmScheduler {
       throw checkError!;
     }
     return canSchedule;
+  }
+
+  @override
+  Future<bool> isRingingAlarm({required int alarmId}) async {
+    if (isRingingError != null) {
+      throw isRingingError!;
+    }
+    return ringingIds.contains(alarmId);
   }
 }
 

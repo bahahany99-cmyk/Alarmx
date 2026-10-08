@@ -124,6 +124,19 @@ class AlarmSchedulerChannelHandler(
                     result.success(can)
                 }
 
+                "isRingingAlarm" -> {
+                    val alarmId = call.argument<Int>("alarmId")
+                    if (alarmId == null) {
+                        result.error(
+                            "INVALID_ARGS",
+                            "isRingingAlarm requires alarmId (Int).",
+                            null,
+                        )
+                        return@handle
+                    }
+                    result.success(AlarmForegroundService.ringingAlarmId == alarmId)
+                }
+
                 "getRingingLaunch" -> {
                     result.success(MainActivity.consumeRingingLaunch())
                 }
