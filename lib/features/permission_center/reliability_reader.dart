@@ -11,6 +11,7 @@ import 'package:alarmx/core/permissions/capability_state.dart';
 import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/permissions/permission_snapshot.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
+import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/missions/permissions/camera_permission.dart';
 import 'package:alarmx/features/permission_center/reliability_calculator.dart';

@@ -43,7 +43,7 @@ void main() {
         return <String, Object?>{'sdkInt': 34, 'batteryExempt': true};
       };
       final Map<String, Object?> snapshot =
-          await MethodChannelPermissionBridge(channel).readSnapshot();
+          await const MethodChannelPermissionBridge(channel).readSnapshot();
       expect(snapshot['sdkInt'], 34);
       expect(snapshot['batteryExempt'], true);
       expect(calls.single.method, 'getPermissionSnapshot');
@@ -52,7 +52,7 @@ void main() {
     test('null reply throws PermissionBridgeException', () async {
       handler = (_) => null;
       expect(
-        MethodChannelPermissionBridge(channel).readSnapshot(),
+        const MethodChannelPermissionBridge(channel).readSnapshot(),
         throwsA(isA<PermissionBridgeException>()),
       );
     });
@@ -60,7 +60,7 @@ void main() {
     test('non-string keys throw PermissionBridgeException', () async {
       handler = (_) => <Object?, Object?>{7: true};
       expect(
-        MethodChannelPermissionBridge(channel).readSnapshot(),
+        const MethodChannelPermissionBridge(channel).readSnapshot(),
         throwsA(isA<PermissionBridgeException>()),
       );
     });
@@ -70,7 +70,7 @@ void main() {
         throw PlatformException(code: 'NATIVE_ERROR', message: 'boom');
       };
       expect(
-        MethodChannelPermissionBridge(channel).readSnapshot(),
+        const MethodChannelPermissionBridge(channel).readSnapshot(),
         throwsA(
           isA<PermissionBridgeException>().having(
             (PermissionBridgeException e) => e.message,
@@ -89,21 +89,21 @@ void main() {
         expect(call.arguments, <String, Object?>{'target': 'battery'});
         return true;
       };
-      final bool launched = await MethodChannelPermissionBridge(channel)
+      final bool launched = await const MethodChannelPermissionBridge(channel)
           .openSettings(PermissionSettingsTarget.battery);
       expect(launched, isTrue);
     });
 
     test('false stays false: failures are never upgraded', () async {
       handler = (_) => false;
-      final bool launched = await MethodChannelPermissionBridge(channel)
+      final bool launched = await const MethodChannelPermissionBridge(channel)
           .openSettings(PermissionSettingsTarget.exactAlarm);
       expect(launched, isFalse);
     });
 
     test('null reply degrades to false', () async {
       handler = (_) => null;
-      final bool launched = await MethodChannelPermissionBridge(channel)
+      final bool launched = await const MethodChannelPermissionBridge(channel)
           .openSettings(PermissionSettingsTarget.notifications);
       expect(launched, isFalse);
     });
@@ -112,7 +112,7 @@ void main() {
       handler = (_) {
         throw PlatformException(code: 'NATIVE_ERROR');
       };
-      final bool launched = await MethodChannelPermissionBridge(channel)
+      final bool launched = await const MethodChannelPermissionBridge(channel)
           .openSettings(PermissionSettingsTarget.appDetails);
       expect(launched, isFalse);
     });
