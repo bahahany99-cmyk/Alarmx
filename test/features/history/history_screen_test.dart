@@ -131,6 +131,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(en.historyUnknownAlarm), findsOneWidget);
+    // Both fixture rows are ongoing: pinned as such, never as successes.
+    expect(find.text(en.historyStatusOngoing), findsNWidgets(2));
     await finishWidgetTest(tester, stack);
   });
 

@@ -73,6 +73,9 @@ void main() {
     expect(find.text(en.statisticsTitle), findsOneWidget);
     expect(find.text(en.statisticsCompleted), findsOneWidget);
     expect(find.text(en.statisticsFailed), findsOneWidget);
+    expect(find.text(en.statisticsAverage), findsOneWidget);
+    expect(find.text(en.statisticsFastest), findsOneWidget);
+    expect(find.text(en.statisticsHardest), findsOneWidget);
     expect(find.text('0'), findsNWidgets(2));
     expect(find.text(en.statisticsUnavailable), findsNWidgets(3));
     await finishWidgetTest(tester, stack);

@@ -56,7 +56,7 @@ class HomeScreen extends StatefulWidget {
   /// History rows for the History screen.
   final AlarmHistoryRepository history;
 
-  /// Alarms for History-screen labels (missing alarms stay readable).
+  /// Alarms for History/Statistics labels (missing alarms stay readable).
   final AlarmRepository alarmRepository;
 
   /// Active UI language code ('ar'/'en'), for the menu checkmark.
