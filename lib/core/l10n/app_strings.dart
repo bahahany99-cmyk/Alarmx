@@ -244,6 +244,13 @@ class AppStrings {
   String get historyAttempts => text('historyAttempts');
   String get historySnoozes => text('historySnoozes');
   String get historyUnknownAlarm => text('historyUnknownAlarm');
+  String get statisticsTitle => text('statisticsTitle');
+  String get statisticsCompleted => text('statisticsCompleted');
+  String get statisticsFailed => text('statisticsFailed');
+  String get statisticsAverage => text('statisticsAverage');
+  String get statisticsFastest => text('statisticsFastest');
+  String get statisticsHardest => text('statisticsHardest');
+  String get statisticsUnavailable => text('statisticsUnavailable');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -426,6 +433,13 @@ class AppStrings {
     'historyAttempts': 'المحاولات',
     'historySnoozes': 'الغفوات',
     'historyUnknownAlarm': 'منبه محذوف',
+    'statisticsTitle': 'الإحصائيات',
+    'statisticsCompleted': 'مكتملة هذا الأسبوع',
+    'statisticsFailed': 'فاشلة هذا الأسبوع',
+    'statisticsAverage': 'متوسط مدة الإيقاف',
+    'statisticsFastest': 'أسرع إيقاف',
+    'statisticsHardest': 'أصعب منبه',
+    'statisticsUnavailable': 'غير متاح',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -610,6 +624,13 @@ class AppStrings {
     'historyAttempts': 'Attempts',
     'historySnoozes': 'Snoozes',
     'historyUnknownAlarm': 'Deleted alarm',
+    'statisticsTitle': 'Statistics',
+    'statisticsCompleted': 'Completed this week',
+    'statisticsFailed': 'Failed this week',
+    'statisticsAverage': 'Average stop time',
+    'statisticsFastest': 'Fastest stop',
+    'statisticsHardest': 'Hardest alarm',
+    'statisticsUnavailable': 'Unavailable',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };

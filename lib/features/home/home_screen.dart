@@ -21,6 +21,7 @@ import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/history/history_screen.dart';
+import 'package:alarmx/features/statistics/statistics_screen.dart';
 import 'package:alarmx/features/home/widgets/alarm_list_tile.dart';
 import 'package:alarmx/features/security/pin_prompt.dart';
 import 'package:alarmx/features/security/security_screen.dart';
@@ -136,6 +137,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openStatistics() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StatisticsScreen(
+          history: widget.history,
+          alarms: widget.alarmRepository,
+        ),
+      ),
+    );
+  }
+
   void _openSecurity() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -233,6 +245,12 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.history),
             tooltip: strings.historyTitle,
             onPressed: _openHistory,
+          ),
+          IconButton(
+            key: const Key('home_statistics_button'),
+            icon: const Icon(Icons.bar_chart),
+            tooltip: strings.statisticsTitle,
+            onPressed: _openStatistics,
           ),
           IconButton(
             key: const Key('home_security_button'),
