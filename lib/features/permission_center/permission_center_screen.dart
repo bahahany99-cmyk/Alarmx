@@ -154,39 +154,44 @@ class _CenterLoaded extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    // Fixed seven rows: a Column builds every row eagerly (a lazy list
+    // would only inflate visible rows, hiding the rest from semantics
+    // and tests until scrolled).
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(12),
-      children: <Widget>[
-        _OverallCard(overall: data.report.overall),
-        _CenterItemCard(
-          item: _NotificationsItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _ExactAlarmItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _FullScreenItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _BatteryItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _BootItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _CameraItem(data),
-          onAction: onAction,
-        ),
-        _CenterItemCard(
-          item: _AlarmsItem(data),
-          onAction: onAction,
-        ),
-      ],
+      child: Column(
+        children: <Widget>[
+          _OverallCard(overall: data.report.overall),
+          _CenterItemCard(
+            item: _NotificationsItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _ExactAlarmItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _FullScreenItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _BatteryItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _BootItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _CameraItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _AlarmsItem(data),
+            onAction: onAction,
+          ),
+        ],
+      ),
     );
   }
 }
