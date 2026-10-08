@@ -54,6 +54,10 @@ class GrantedPermissionGate implements CameraPermissionGate {
       CameraPermissionOutcome.granted;
 
   @override
+  Future<CameraPermissionOutcome> checkCameraStatus() async =>
+      CameraPermissionOutcome.granted;
+
+  @override
   Future<void> openSettings() async {}
 }
 

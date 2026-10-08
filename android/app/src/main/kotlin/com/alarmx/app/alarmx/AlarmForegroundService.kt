@@ -70,7 +70,11 @@ class AlarmForegroundService : Service() {
          */
         const val EXTRA_TRIGGER_AT_MILLIS = "trigger_at_millis"
 
-        private const val RINGING_CHANNEL_ID = "alarmx_ringing_channel"
+        /**
+         * Visible for the Permission Center snapshot reader, which reports
+         * whether this channel is still enabled. The value itself is fixed.
+         */
+        const val RINGING_CHANNEL_ID = "alarmx_ringing_channel"
         private const val RINGING_CHANNEL_NAME = "AlarmX Ringing"
         private const val RINGING_NOTIFICATION_ID = 2000
 

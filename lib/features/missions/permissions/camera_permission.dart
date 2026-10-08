@@ -26,6 +26,12 @@ abstract class CameraPermissionGate {
   /// platform errors degrade to [CameraPermissionOutcome.denied].
   Future<CameraPermissionOutcome> requestCamera();
 
+  /// Checks the current camera status WITHOUT requesting it, for the
+  /// Permission Center: viewing capabilities must never trigger a system
+  /// prompt. Never throws: platform errors degrade to
+  /// [CameraPermissionOutcome.denied].
+  Future<CameraPermissionOutcome> checkCameraStatus();
+
   /// Opens the app settings page (permanently-denied recovery). Best
   /// effort; never throws.
   Future<void> openSettings();

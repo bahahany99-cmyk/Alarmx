@@ -18,13 +18,21 @@ import '../../support/test_doubles.dart';
 /// Scripted permission gate for tests.
 class FakeCameraPermissionGate implements CameraPermissionGate {
   CameraPermissionOutcome nextOutcome = CameraPermissionOutcome.granted;
+  CameraPermissionOutcome currentStatus = CameraPermissionOutcome.granted;
   int requests = 0;
+  int checks = 0;
   int settingsOpened = 0;
 
   @override
   Future<CameraPermissionOutcome> requestCamera() async {
     requests++;
     return nextOutcome;
+  }
+
+  @override
+  Future<CameraPermissionOutcome> checkCameraStatus() async {
+    checks++;
+    return currentStatus;
   }
 
   @override

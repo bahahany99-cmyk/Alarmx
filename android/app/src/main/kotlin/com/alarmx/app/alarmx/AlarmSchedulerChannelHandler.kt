@@ -25,6 +25,18 @@ import io.flutter.plugin.common.MethodChannel
  *     null for a normal start.
  *   - `stopRingingAlarm`  args: `{ "alarmId": Int }`: stops the ring
  *     through the service `ACTION_STOP` path (idempotent).
+ *   - `getPermissionSnapshot`  args: `{}`: one map with the raw system
+ *     states the Permission Center reports (`sdkInt`,
+ *     `notificationsEnabled`, `postNotificationsGranted?`,
+ *     `ringingChannelEnabled`, `canScheduleExactAlarms`,
+ *     `fullScreenIntentAllowed?`, `batteryExempt`,
+ *     `bootReceiverEnabled`). Each probe fails soft to null (Dart reads
+ *     null as unknown) so one OEM quirk never blanks the snapshot.
+ *   - `openSystemSettings`  args: `{ "target": String }`: opens a system
+ *     settings page (`notifications`, `exactAlarm`, `fullScreen`,
+ *     `battery`, `appDetails`), resolve-checked with an app-details
+ *     fallback. Returns whether a page was launched; targets with no
+ *     page on the running Android version return false.
  *
  * A schedule call carrying a fire payload (label and/or vibration key
  * present) is a real persisted alarm: its config is frozen into the
@@ -132,6 +144,23 @@ class AlarmSchedulerChannelHandler(
                     }
                     Log.d("AlarmX", "Stop sent to ringing service for id: $alarmId.")
                     result.success(null)
+                }
+
+                "getPermissionSnapshot" -> {
+                    result.success(buildPermissionSnapshot())
+                }
+
+                "openSystemSettings" -> {
+                    val target = call.argument<String>("target")
+                    if (target == null) {
+                        result.error(
+                            "INVALID_ARGS",
+                            "openSystemSettings requires target (String).",
+                            null,
+                        )
+                        return@handle
+                    }
+                    result.success(openSettingsTarget(target))
                 }
 
                 else -> result.notImplemented()
