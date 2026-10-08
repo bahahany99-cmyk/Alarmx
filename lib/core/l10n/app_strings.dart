@@ -251,6 +251,47 @@ class AppStrings {
   String get statisticsFastest => text('statisticsFastest');
   String get statisticsHardest => text('statisticsHardest');
   String get statisticsUnavailable => text('statisticsUnavailable');
+  String get permissionCenterTitle => text('permissionCenterTitle');
+  String get permissionCenterSubtitle => text('permissionCenterSubtitle');
+  String get permissionCenterRetry => text('permissionCenterRetry');
+  String get permissionCenterRefresh => text('permissionCenterRefresh');
+  String get permissionCenterLoadFailed => text('permissionCenterLoadFailed');
+  String get permissionCenterActionFailed => text('permissionCenterActionFailed');
+  String get permissionCenterFix => text('permissionCenterFix');
+  String get reliabilityReliable => text('reliabilityReliable');
+  String get reliabilityMostly => text('reliabilityMostly');
+  String get reliabilityAttention => text('reliabilityAttention');
+  String get reliabilityExplainReliable => text('reliabilityExplainReliable');
+  String get reliabilityExplainMostly => text('reliabilityExplainMostly');
+  String get reliabilityExplainAttention => text('reliabilityExplainAttention');
+  String get permNotificationsTitle => text('permNotificationsTitle');
+  String get permNotificationsExplain => text('permNotificationsExplain');
+  String get permExactAlarmTitle => text('permExactAlarmTitle');
+  String get permExactAlarmExplain => text('permExactAlarmExplain');
+  String get permFullScreenTitle => text('permFullScreenTitle');
+  String get permFullScreenExplain => text('permFullScreenExplain');
+  String get permBatteryTitle => text('permBatteryTitle');
+  String get permBatteryExplain => text('permBatteryExplain');
+  String get permBootTitle => text('permBootTitle');
+  String get permBootExplain => text('permBootExplain');
+  String get permCameraTitle => text('permCameraTitle');
+  String get permCameraExplain => text('permCameraExplain');
+  String get permAlarmsTitle => text('permAlarmsTitle');
+  String get permAlarmsExplain => text('permAlarmsExplain');
+  String get permStateReady => text('permStateReady');
+  String get permStateDenied => text('permStateDenied');
+  String get permStateNotExempt => text('permStateNotExempt');
+  String get permStateUnavailable => text('permStateUnavailable');
+  String get permStateNotApplicable => text('permStateNotApplicable');
+  String get permStateRestricted => text('permStateRestricted');
+  String get permStateUnknown => text('permStateUnknown');
+  String get permStateNotRequired => text('permStateNotRequired');
+  String get permTagRequired => text('permTagRequired');
+  String get permTagRecommended => text('permTagRecommended');
+  String get permTagConditional => text('permTagConditional');
+  String get reliabilityHomeReady => text('reliabilityHomeReady');
+  String get reliabilityHomeAttention => text('reliabilityHomeAttention');
+  String get permAlarmsNone => text('permAlarmsNone');
   String get msgMissionsLoadFailed => text('msgMissionsLoadFailed');
   String get missionFieldRequired => text('missionFieldRequired');
 
@@ -440,6 +481,47 @@ class AppStrings {
     'statisticsFastest': 'أسرع إيقاف',
     'statisticsHardest': 'أصعب منبه',
     'statisticsUnavailable': 'غير متاح',
+    'permissionCenterTitle': 'مركز الصلاحيات',
+    'permissionCenterSubtitle': 'تتحكم أندرويد في هذه الإعدادات. يعرض هذا المركز حالتها الحالية فقط.',
+    'permissionCenterRetry': 'إعادة المحاولة',
+    'permissionCenterRefresh': 'تحديث',
+    'permissionCenterLoadFailed': 'تعذّر قراءة حالة النظام',
+    'permissionCenterActionFailed': 'تعذّر فتح صفحة الإعدادات',
+    'permissionCenterFix': 'فتح الإعدادات',
+    'reliabilityReliable': 'جاهز',
+    'reliabilityMostly': 'شبه جاهز',
+    'reliabilityAttention': 'يحتاج إلى انتباه',
+    'reliabilityExplainReliable': 'جميع الفحوصات المهمة سليمة.',
+    'reliabilityExplainMostly': 'بعض العناصر المستحسنة أو المشروطة تستحق المراجعة.',
+    'reliabilityExplainAttention': 'أصلح العناصر الحرجة لتعمل المنبهات بموثوقية.',
+    'permNotificationsTitle': 'الإشعارات',
+    'permNotificationsExplain': 'مطلوبة لعرض المنبه ورنينه في المقدمة.',
+    'permExactAlarmTitle': 'المنبه الدقيق',
+    'permExactAlarmExplain': 'مطلوب لرنين المنبه في وقته المحدد تمامًا.',
+    'permFullScreenTitle': 'ملء الشاشة',
+    'permFullScreenExplain': 'يسمح بفتح شاشة الرنين تلقائيًا فوق شاشة القفل.',
+    'permBatteryTitle': 'البطارية',
+    'permBatteryExplain': 'مستحسن وليس إلزاميًا، وقد يحسّن الموثوقية على بعض الأجهزة.',
+    'permBootTitle': 'إعادة التشغيل',
+    'permBootExplain': 'تُعاد جدولة المنبهات تلقائيًا بعد إعادة تشغيل الجهاز.',
+    'permCameraTitle': 'الكاميرا',
+    'permCameraExplain': 'تُطلب فقط عند تشغيل مهمة كاميرا فعلية.',
+    'permAlarmsTitle': 'المنبهات المفعّلة',
+    'permAlarmsExplain': 'عدد المنبهات المفعّلة حاليًا.',
+    'permStateReady': 'جاهز',
+    'permStateDenied': 'غير مسموح',
+    'permStateNotExempt': 'غير مستثنى',
+    'permStateUnavailable': 'غير متاح',
+    'permStateNotApplicable': 'لا ينطبق',
+    'permStateRestricted': 'مقيّد',
+    'permStateUnknown': 'غير معروف',
+    'permStateNotRequired': 'غير مطلوب حاليًا',
+    'permTagRequired': 'مطلوب',
+    'permTagRecommended': 'مستحسن',
+    'permTagConditional': 'مشروط',
+    'reliabilityHomeReady': 'الموثوقية: جاهز',
+    'reliabilityHomeAttention': 'الموثوقية: تحتاج إلى انتباه',
+    'permAlarmsNone': 'لا يوجد',
     'msgMissionsLoadFailed': 'تعذّر تحميل المهام',
     'missionFieldRequired': 'هذا الحقل مطلوب',
   };
@@ -631,6 +713,47 @@ class AppStrings {
     'statisticsFastest': 'Fastest stop',
     'statisticsHardest': 'Hardest alarm',
     'statisticsUnavailable': 'Unavailable',
+    'permissionCenterTitle': 'Permission Center',
+    'permissionCenterSubtitle': 'Android controls these settings. This center only shows their current state.',
+    'permissionCenterRetry': 'Retry',
+    'permissionCenterRefresh': 'Refresh',
+    'permissionCenterLoadFailed': 'Could not read system status',
+    'permissionCenterActionFailed': 'Could not open the settings page',
+    'permissionCenterFix': 'Open Settings',
+    'reliabilityReliable': 'Ready',
+    'reliabilityMostly': 'Mostly ready',
+    'reliabilityAttention': 'Needs attention',
+    'reliabilityExplainReliable': 'All important checks pass.',
+    'reliabilityExplainMostly': 'Some recommended or conditional items deserve a look.',
+    'reliabilityExplainAttention': 'Fix the critical items for reliable alarms.',
+    'permNotificationsTitle': 'Notifications',
+    'permNotificationsExplain': 'Needed to show alarms and ring in the foreground.',
+    'permExactAlarmTitle': 'Exact alarms',
+    'permExactAlarmExplain': 'Required for alarms to ring at their exact time.',
+    'permFullScreenTitle': 'Full screen',
+    'permFullScreenExplain': 'Lets the ringing screen open automatically over the lock screen.',
+    'permBatteryTitle': 'Battery',
+    'permBatteryExplain': 'Recommended, not mandatory, and may improve reliability on some devices.',
+    'permBootTitle': 'Restart',
+    'permBootExplain': 'Alarms are rescheduled automatically after a restart.',
+    'permCameraTitle': 'Camera',
+    'permCameraExplain': 'Only requested when a camera mission actually runs.',
+    'permAlarmsTitle': 'Enabled alarms',
+    'permAlarmsExplain': 'How many alarms are currently enabled.',
+    'permStateReady': 'Ready',
+    'permStateDenied': 'Not allowed',
+    'permStateNotExempt': 'Not exempt',
+    'permStateUnavailable': 'Unavailable',
+    'permStateNotApplicable': 'Not applicable',
+    'permStateRestricted': 'Restricted',
+    'permStateUnknown': 'Unknown',
+    'permStateNotRequired': 'Not required now',
+    'permTagRequired': 'Required',
+    'permTagRecommended': 'Recommended',
+    'permTagConditional': 'Conditional',
+    'reliabilityHomeReady': 'Reliability: ready',
+    'reliabilityHomeAttention': 'Reliability: needs attention',
+    'permAlarmsNone': 'None',
     'msgMissionsLoadFailed': 'Could not load missions',
     'missionFieldRequired': 'This field is required',
   };

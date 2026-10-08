@@ -16,6 +16,7 @@ import 'package:alarmx/core/alarms/native_alarm_scheduler_impl.dart';
 import 'package:alarmx/core/bootstrap/app_bootstrap.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
@@ -25,6 +26,7 @@ import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/home/home_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/missions/permissions/camera_permission.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_alarm_bridge.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_launch.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_mission_screen.dart';
@@ -59,6 +61,8 @@ Future<void> main() async {
       missionService: MissionService(DriftMissionRepository(db.missionDao)),
       history: DriftAlarmHistoryRepository(db.alarmHistoryDao),
       ringingBridge: MethodChannelRingingBridge(),
+      permissionBridge: const MethodChannelPermissionBridge(),
+      cameraGate: const PermissionHandlerCameraGate(),
     ),
   );
 }
@@ -77,6 +81,8 @@ class AlarmxApp extends StatefulWidget {
     required this.missionService,
     required this.history,
     this.ringingBridge,
+    this.permissionBridge = const MethodChannelPermissionBridge(),
+    this.cameraGate = const PermissionHandlerCameraGate(),
     this.events,
   });
 
@@ -90,6 +96,13 @@ class AlarmxApp extends StatefulWidget {
   /// Production passes the MethodChannel bridge so ring launches route to
   /// the mission screen.
   final RingingAlarmBridge? ringingBridge;
+
+  /// Native permission bridge for reliability; production passes the
+  /// MethodChannel bridge, tests use fakes.
+  final PermissionSystemBridge permissionBridge;
+
+  /// Camera gate for reliability status checks (never requests).
+  final CameraPermissionGate cameraGate;
 
   /// Event listener override for tests; production uses a live one.
   final NativeAlarmEvents? events;
@@ -213,6 +226,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
                   settings: widget.settings,
                   history: widget.history,
                   alarmRepository: widget.repository,
+                  permissionBridge: widget.permissionBridge,
+                  cameraGate: widget.cameraGate,
                   languageCode: languageCode,
                   onLanguageChanged: _setLanguage,
                 )
@@ -238,6 +253,8 @@ class _AlarmxAppState extends State<AlarmxApp> {
                         settings: widget.settings,
                         history: widget.history,
                         alarmRepository: widget.repository,
+                        permissionBridge: widget.permissionBridge,
+                        cameraGate: widget.cameraGate,
                         languageCode: languageCode,
                         onLanguageChanged: _setLanguage,
                       );

@@ -14,12 +14,17 @@
 import 'package:alarmx/core/alarms/alarm_controller.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/missions/permissions/camera_permission.dart';
+import 'package:alarmx/features/permission_center/permission_center_screen.dart';
+import 'package:alarmx/features/permission_center/reliability_calculator.dart';
+import 'package:alarmx/features/permission_center/reliability_reader.dart';
 import 'package:alarmx/features/history/history_screen.dart';
 import 'package:alarmx/features/statistics/statistics_screen.dart';
 import 'package:alarmx/features/home/widgets/alarm_list_tile.dart';
@@ -37,6 +42,8 @@ class HomeScreen extends StatefulWidget {
     required this.settings,
     required this.history,
     required this.alarmRepository,
+    required this.permissionBridge,
+    required this.cameraGate,
     required this.languageCode,
     required this.onLanguageChanged,
   });
@@ -59,6 +66,13 @@ class HomeScreen extends StatefulWidget {
   /// Alarms for History/Statistics labels (missing alarms stay readable).
   final AlarmRepository alarmRepository;
 
+  /// Native permission snapshot + settings actions for the reliability
+  /// indicator and the Permission Center.
+  final PermissionSystemBridge permissionBridge;
+
+  /// Check-only camera status for reliability (never requests).
+  final CameraPermissionGate cameraGate;
+
   /// Active UI language code ('ar'/'en'), for the menu checkmark.
   final String languageCode;
 
@@ -72,6 +86,42 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   /// Alarm ids with an in-flight toggle, ignoring repeat taps.
   final Set<int> _busyToggleIds = <int>{};
+
+  /// Overall reliability for the indicator; null while loading or when the
+  /// read fails (neutral shield, never a guessed state).
+  ReliabilityOverall? _reliability;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReliability();
+  }
+
+  /// One-shot reliability read: at open and after returning from the
+  /// center. Never polled, never on a timer.
+  Future<void> _loadReliability() async {
+    try {
+      final ReliabilityData data = await readReliability(
+        bridge: widget.permissionBridge,
+        cameraGate: widget.cameraGate,
+        alarms: widget.alarmRepository,
+        missions: widget.missionService,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _reliability = data.report.overall;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _reliability = null;
+      });
+    }
+  }
 
   Future<void> _openCreate() async {
     final AlarmUiResult? result = await Navigator.of(context).push(
@@ -146,6 +196,48 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openPermissionCenter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PermissionCenterScreen(
+          bridge: widget.permissionBridge,
+          cameraGate: widget.cameraGate,
+          alarms: widget.alarmRepository,
+          missions: widget.missionService,
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    await _loadReliability();
+  }
+
+  IconData _reliabilityIcon() {
+    switch (_reliability) {
+      case ReliabilityOverall.reliable:
+        return Icons.verified_outlined;
+      case ReliabilityOverall.mostlyReady:
+        return Icons.warning_amber_outlined;
+      case ReliabilityOverall.attentionRequired:
+        return Icons.error_outline;
+      case null:
+        return Icons.shield_outlined;
+    }
+  }
+
+  String _reliabilityTooltip(AppStrings strings) {
+    switch (_reliability) {
+      case ReliabilityOverall.reliable:
+        return strings.reliabilityHomeReady;
+      case ReliabilityOverall.mostlyReady:
+      case ReliabilityOverall.attentionRequired:
+        return strings.reliabilityHomeAttention;
+      case null:
+        return strings.permissionCenterTitle;
+    }
   }
 
   void _openSecurity() {
@@ -257,6 +349,12 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.security),
             tooltip: strings.securityTitle,
             onPressed: _openSecurity,
+          ),
+          IconButton(
+            key: const Key('home_reliability_button'),
+            icon: Icon(_reliabilityIcon()),
+            tooltip: _reliabilityTooltip(strings),
+            onPressed: _openPermissionCenter,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.language),

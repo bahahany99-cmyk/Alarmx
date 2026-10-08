@@ -17,12 +17,14 @@ import 'package:alarmx/core/alarms/native_alarm_scheduler.dart';
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/missions/permissions/camera_permission.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/home/home_screen.dart';
@@ -221,11 +223,88 @@ Future<void> pumpAlarmxApp(
 }
 
 /// Pumps [HomeScreen] standalone in [language].
+/// Scriptable native permission bridge for tests.
+class FakePermissionSystemBridge implements PermissionSystemBridge {
+  FakePermissionSystemBridge({Map<String, Object?>? snapshot})
+      : snapshot = snapshot ?? fakeGrantedSnapshot();
+
+  /// Snapshot returned by [readSnapshot].
+  Map<String, Object?> snapshot;
+
+  /// When true, [readSnapshot] throws [PermissionBridgeException].
+  bool failReads = false;
+
+  /// Verdict returned by [openSettings].
+  bool settingsResult = true;
+
+  /// Targets passed to [openSettings], in order.
+  final List<PermissionSettingsTarget> opened = <PermissionSettingsTarget>[];
+
+  int reads = 0;
+
+  @override
+  Future<Map<String, Object?>> readSnapshot() async {
+    reads++;
+    if (failReads) {
+      throw const PermissionBridgeException('fake read failure');
+    }
+    return snapshot;
+  }
+
+  @override
+  Future<bool> openSettings(PermissionSettingsTarget target) async {
+    opened.add(target);
+    return settingsResult;
+  }
+}
+
+/// All-granted native snapshot map for tests.
+Map<String, Object?> fakeGrantedSnapshot({int sdkInt = 34}) {
+  return <String, Object?>{
+    'sdkInt': sdkInt,
+    'notificationsEnabled': true,
+    'postNotificationsGranted': sdkInt >= 33 ? true : null,
+    'ringingChannelEnabled': true,
+    'canScheduleExactAlarms': true,
+    'fullScreenIntentAllowed': sdkInt >= 34 ? true : null,
+    'batteryExempt': true,
+    'bootReceiverEnabled': true,
+  };
+}
+
+/// Scriptable camera gate for reliability tests (status only).
+class FakeCameraStatusGate implements CameraPermissionGate {
+  FakeCameraStatusGate([
+    this.status = CameraPermissionOutcome.granted,
+  ]);
+
+  CameraPermissionOutcome status;
+  int checks = 0;
+  int requests = 0;
+
+  @override
+  Future<CameraPermissionOutcome> checkCameraStatus() async {
+    checks++;
+    return status;
+  }
+
+  @override
+  Future<CameraPermissionOutcome> requestCamera() async {
+    requests++;
+    return status;
+  }
+
+  @override
+  Future<void> openSettings() async {}
+}
+
 Future<void> pumpHome(
   WidgetTester tester,
   TestStack stack, {
   String language = AppLanguage.english,
   ValueChanged<String>? onLanguageChanged,
+  PermissionSystemBridge? permissionBridge,
+  CameraPermissionGate? cameraGate,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -239,6 +318,8 @@ Future<void> pumpHome(
         settings: stack.settings,
         history: stack.history,
         alarmRepository: stack.repository,
+        permissionBridge: permissionBridge ?? FakePermissionSystemBridge(),
+        cameraGate: cameraGate ?? FakeCameraStatusGate(),
         languageCode: language,
         onLanguageChanged: onLanguageChanged ?? (_) {},
       ),

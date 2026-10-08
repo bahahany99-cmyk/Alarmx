@@ -52,7 +52,7 @@ abstract class PermissionSystemBridge {
 
 /// [PermissionSystemBridge] over the shared scheduler MethodChannel.
 class MethodChannelPermissionBridge implements PermissionSystemBridge {
-  MethodChannelPermissionBridge([MethodChannel? channel])
+  const MethodChannelPermissionBridge([MethodChannel? channel])
       : _channel = channel ??
             const MethodChannel('com.alarmx.app.alarmx/alarm_scheduler');
 
