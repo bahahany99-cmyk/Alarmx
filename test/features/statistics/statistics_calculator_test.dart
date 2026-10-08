@@ -26,7 +26,7 @@ void main() {
     );
   }
 
-  DateTime at(int day, int hour, [int minute = 0, int second = 0]) =>
+  DateTime at(int day, [int hour = 0, int minute = 0, int second = 0]) =>
       DateTime(2026, 10, day, hour, minute, second);
 
   String? labels(int? alarmId) =>
