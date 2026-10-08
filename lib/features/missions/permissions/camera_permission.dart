@@ -59,6 +59,25 @@ class PermissionHandlerCameraGate implements CameraPermissionGate {
   }
 
   @override
+  Future<CameraPermissionOutcome> checkCameraStatus() async {
+    final PermissionStatus status;
+    try {
+      // Status check only: this never prompts, so the Permission Center
+      // can display camera state without disturbing just-in-time flow.
+      status = await Permission.camera.status;
+    } catch (_) {
+      return CameraPermissionOutcome.denied;
+    }
+    if (status.isGranted) {
+      return CameraPermissionOutcome.granted;
+    }
+    if (status.isPermanentlyDenied) {
+      return CameraPermissionOutcome.permanentlyDenied;
+    }
+    return CameraPermissionOutcome.denied;
+  }
+
+  @override
   Future<void> openSettings() async {
     try {
       await openAppSettings();
