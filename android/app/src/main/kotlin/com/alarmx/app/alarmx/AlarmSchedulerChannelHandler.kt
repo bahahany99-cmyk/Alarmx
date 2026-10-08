@@ -1,10 +1,17 @@
 package com.alarmx.app.alarmx
 
+import android.Manifest
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -224,6 +231,161 @@ class AlarmSchedulerChannelHandler(
             context.stopService(Intent(context, AlarmForegroundService::class.java))
         } catch (t: Throwable) {
             Log.w("AlarmX", "Could not stop ringing service during cancel.", t)
+        }
+    }
+
+    /**
+    /**
+     * Reads the raw system states for the Permission Center snapshot. Every
+     * probe fails soft to null so a single OEM quirk degrades one
+     * capability to unknown instead of failing the whole call. No state is
+     * ever requested or changed here: this only reports what Android
+     * currently allows.
+     */
+    private fun buildPermissionSnapshot(): Map<String, Any?> {
+        val sdkInt = Build.VERSION.SDK_INT
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val powerManager =
+            context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val notificationsEnabled: Boolean? = runCatching {
+            notificationManager.areNotificationsEnabled()
+        }.getOrNull()
+        // Runtime permission on API 33+; the concept does not exist below.
+        val postNotificationsGranted: Boolean? = if (sdkInt >= 33) {
+            runCatching {
+                context.checkSelfPermission(
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            }.getOrNull()
+        } else {
+            null
+        }
+        // A channel that was never created (no ring yet) follows the app
+        // default, which is enabled; only an explicit IMPORTANCE_NONE
+        // reports disabled.
+        val ringingChannelEnabled: Boolean? = runCatching {
+            val channel = notificationManager.getNotificationChannel(
+                AlarmForegroundService.RINGING_CHANNEL_ID,
+            )
+            channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+        }.getOrNull()
+        val canScheduleExact: Boolean? = if (sdkInt >= Build.VERSION_CODES.S) {
+            runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull()
+        } else {
+            true
+        }
+        val fullScreenIntentAllowed: Boolean? =
+            if (sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                runCatching {
+                    notificationManager.canUseFullScreenIntent()
+                }.getOrNull()
+            } else {
+                null
+            }
+        val batteryExempt: Boolean? = runCatching {
+            powerManager.isIgnoringBatteryOptimizations(context.packageName)
+        }.getOrNull()
+        val bootReceiverEnabled: Boolean? = runCatching {
+            when (
+                context.packageManager.getComponentEnabledSetting(
+                    ComponentName(context, BootReceiver::class.java),
+                )
+            ) {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
+                -> true
+                else -> false
+            }
+        }.getOrNull()
+        return mapOf(
+            "sdkInt" to sdkInt,
+            "notificationsEnabled" to notificationsEnabled,
+            "postNotificationsGranted" to postNotificationsGranted,
+            "ringingChannelEnabled" to ringingChannelEnabled,
+            "canScheduleExactAlarms" to canScheduleExact,
+            "fullScreenIntentAllowed" to fullScreenIntentAllowed,
+            "batteryExempt" to batteryExempt,
+            "bootReceiverEnabled" to bootReceiverEnabled,
+        )
+    }
+
+    /**
+     * Opens the system settings page for [target], checking resolvability
+     * first so OEMs without the page never crash us. Candidates fall back
+     * to the app-details page; targets with no page on this Android
+     * version return false instead of opening something unrelated.
+     */
+    private fun openSettingsTarget(target: String): Boolean {
+        val packageName = context.packageName
+        val packageUri = Uri.parse("package:$packageName")
+        val candidates: List<Intent> = when (target) {
+            "notifications" -> listOf(
+                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    .putExtra(
+                        Settings.EXTRA_CHANNEL_ID,
+                        AlarmForegroundService.RINGING_CHANNEL_ID,
+                    ),
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+            )
+            "exactAlarm" -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+                listOf(
+                    Intent(
+                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        packageUri,
+                    ),
+                )
+            }
+            "fullScreen" -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+                listOf(
+                    Intent(
+                        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        packageUri,
+                    ),
+                )
+            }
+            // The settings list needs no permission; the direct exemption
+            // request action would need REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            // in the manifest (Play-policy sensitive), so we do not use it.
+            "battery" -> listOf(
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            )
+            "appDetails" -> emptyList()
+            else -> throw IllegalArgumentException("Unknown settings target: $target")
+        }
+        val fallback =
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
+        for (intent in candidates + fallback) {
+            if (launchIfResolvable(intent)) return true
+        }
+        return false
+    }
+
+    /**
+     * Starts [intent] when some activity resolves it. Never throws: every
+     * failure (unresolvable, OEM quirk, SecurityException) is a `false`
+     * the caller can fall back from or report honestly.
+     */
+    private fun launchIfResolvable(intent: Intent): Boolean {
+        return try {
+            val resolved = context.packageManager.queryIntentActivities(
+                intent,
+                PackageManager.MATCH_DEFAULT_ONLY,
+            )
+            if (resolved.isEmpty()) {
+                Log.d("AlarmX", "No activity for settings intent: ${intent.action}.")
+                return false
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            true
+        } catch (t: Throwable) {
+            Log.w("AlarmX", "Settings intent failed: ${intent.action}.", t)
+            false
         }
     }
 
