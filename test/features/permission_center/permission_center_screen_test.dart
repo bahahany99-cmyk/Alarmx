@@ -96,6 +96,7 @@ void main() {
     // Six rows plus the overall title share the Ready wording.
     expect(find.text(en.permStateReady, skipOffstage: false), findsNWidgets(7));
     expect(find.text('1', skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permTagRequired, skipOffstage: false), findsNWidgets(4));
     await finishWidgetTest(tester, stack);
   });
 
@@ -180,6 +181,7 @@ void main() {
     );
 
     expect(find.text(en.permStateRestricted, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permTagConditional, skipOffstage: false), findsOneWidget);
     expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
     expect(
       find.byKey(const Key('permission_action_camera'), skipOffstage: false),
