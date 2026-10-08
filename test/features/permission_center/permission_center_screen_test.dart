@@ -63,14 +63,14 @@ void main() {
     await stack.insertAlarm(label: 'Work');
     await pumpCenter(tester, stack);
 
-    expect(find.text(en.permissionCenterTitle), findsOneWidget);
-    expect(find.text(en.permNotificationsTitle), findsOneWidget);
-    expect(find.text(en.permExactAlarmTitle), findsOneWidget);
-    expect(find.text(en.permFullScreenTitle), findsOneWidget);
-    expect(find.text(en.permBatteryTitle), findsOneWidget);
-    expect(find.text(en.permBootTitle), findsOneWidget);
-    expect(find.text(en.permCameraTitle), findsOneWidget);
-    expect(find.text(en.permAlarmsTitle), findsOneWidget);
+    expect(find.text(en.permissionCenterTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permNotificationsTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permExactAlarmTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permFullScreenTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permBatteryTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permBootTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permCameraTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permAlarmsTitle, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -92,10 +92,10 @@ void main() {
     await stack.insertAlarm(label: 'Work');
     await pumpCenter(tester, stack);
 
-    expect(find.text(en.reliabilityExplainReliable), findsOneWidget);
+    expect(find.text(en.reliabilityExplainReliable, skipOffstage: false), findsOneWidget);
     // Six rows plus the overall title share the Ready wording.
-    expect(find.text(en.permStateReady), findsNWidgets(7));
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text(en.permStateReady, skipOffstage: false), findsNWidgets(7));
+    expect(find.text('1', skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -114,26 +114,26 @@ void main() {
       cameraGate: FakeCameraStatusGate(CameraPermissionOutcome.denied),
     );
 
-    expect(find.text(en.reliabilityAttention), findsOneWidget);
-    expect(find.text(en.reliabilityExplainAttention), findsOneWidget);
-    expect(find.text(en.permStateDenied), findsNWidgets(2));
-    expect(find.text(en.permStateNotExempt), findsOneWidget);
-    expect(find.text(en.permStateUnavailable), findsOneWidget);
-    expect(find.text(en.permStateNotRequired), findsOneWidget);
+    expect(find.text(en.reliabilityAttention, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.reliabilityExplainAttention, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateDenied, skipOffstage: false), findsNWidgets(2));
+    expect(find.text(en.permStateNotExempt, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateUnavailable, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateNotRequired, skipOffstage: false), findsOneWidget);
     expect(
-      find.byKey(const Key('permission_action_notifications')),
+      find.byKey(const Key('permission_action_notifications'), skipOffstage: false),
       findsOneWidget,
     );
     expect(
-      find.byKey(const Key('permission_action_exactAlarm')),
+      find.byKey(const Key('permission_action_exactAlarm'), skipOffstage: false),
       findsOneWidget,
     );
     expect(
-      find.byKey(const Key('permission_action_battery')),
+      find.byKey(const Key('permission_action_battery'), skipOffstage: false),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('permission_action_boot')), findsNothing);
-    expect(find.byKey(const Key('permission_action_camera')), findsNothing);
+    expect(find.byKey(const Key('permission_action_boot'), skipOffstage: false), findsNothing);
+    expect(find.byKey(const Key('permission_action_camera'), skipOffstage: false), findsNothing);
     await finishWidgetTest(tester, stack);
   });
 
@@ -148,9 +148,9 @@ void main() {
       bridge: FakePermissionSystemBridge(snapshot: active),
     );
 
-    expect(find.text(en.reliabilityMostly), findsOneWidget);
-    expect(find.text(en.permStateNotExempt), findsOneWidget);
-    expect(find.text(en.permTagRecommended), findsOneWidget);
+    expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateNotExempt, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permTagRecommended, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -163,9 +163,9 @@ void main() {
       cameraGate: FakeCameraStatusGate(CameraPermissionOutcome.denied),
     );
 
-    expect(find.text(en.permStateNotRequired), findsOneWidget);
-    expect(find.text(en.reliabilityReliable), findsWidgets);
-    expect(find.byKey(const Key('permission_action_camera')), findsNothing);
+    expect(find.text(en.permStateNotRequired, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.reliabilityReliable, skipOffstage: false), findsWidgets);
+    expect(find.byKey(const Key('permission_action_camera'), skipOffstage: false), findsNothing);
     await finishWidgetTest(tester, stack);
   });
 
@@ -179,10 +179,10 @@ void main() {
           FakeCameraStatusGate(CameraPermissionOutcome.permanentlyDenied),
     );
 
-    expect(find.text(en.permStateRestricted), findsOneWidget);
-    expect(find.text(en.reliabilityMostly), findsOneWidget);
+    expect(find.text(en.permStateRestricted, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
     expect(
-      find.byKey(const Key('permission_action_camera')),
+      find.byKey(const Key('permission_action_camera'), skipOffstage: false),
       findsOneWidget,
     );
     await finishWidgetTest(tester, stack);
@@ -199,14 +199,14 @@ void main() {
       ),
     );
 
-    expect(find.text(en.permStateNotApplicable), findsNWidgets(2));
+    expect(find.text(en.permStateNotApplicable, skipOffstage: false), findsNWidgets(2));
     expect(
-      find.byKey(const Key('permission_action_exactAlarm')),
+      find.byKey(const Key('permission_action_exactAlarm'), skipOffstage: false),
       findsNothing,
     );
-    expect(find.byKey(const Key('permission_action_fullScreen')), findsNothing);
+    expect(find.byKey(const Key('permission_action_fullScreen'), skipOffstage: false), findsNothing);
     expect(
-      find.byKey(const Key('permission_action_notifications')),
+      find.byKey(const Key('permission_action_notifications'), skipOffstage: false),
       findsOneWidget,
     );
     await finishWidgetTest(tester, stack);
@@ -218,13 +218,18 @@ void main() {
     final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
     await pumpCenter(tester, stack, bridge: bridge);
 
-    await tester.tap(find.byKey(const Key('permission_action_battery')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_battery'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_battery'), skipOffstage: false));
     await pumpSettle(tester);
 
     expect(bridge.opened, <PermissionSettingsTarget>[
       PermissionSettingsTarget.battery,
     ]);
-    expect(find.text(en.permissionCenterActionFailed), findsNothing);
+    expect(find.text(en.permissionCenterActionFailed, skipOffstage: false), findsNothing);
     await finishWidgetTest(tester, stack);
   });
 
@@ -235,10 +240,15 @@ void main() {
       ..settingsResult = false;
     await pumpCenter(tester, stack, bridge: bridge);
 
-    await tester.tap(find.byKey(const Key('permission_action_battery')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_battery'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_battery'), skipOffstage: false));
     await pumpSettle(tester);
 
-    expect(find.text(en.permissionCenterActionFailed), findsOneWidget);
+    expect(find.text(en.permissionCenterActionFailed, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -246,7 +256,7 @@ void main() {
     await stack.insertAlarm(label: 'Work');
     final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
     await pumpCenter(tester, stack, bridge: bridge);
-    expect(find.text(en.reliabilityExplainReliable), findsOneWidget);
+    expect(find.text(en.reliabilityExplainReliable, skipOffstage: false), findsOneWidget);
     final int reads = bridge.reads;
 
     final Map<String, Object?> denied = fakeGrantedSnapshot();
@@ -256,7 +266,7 @@ void main() {
     await pumpSettle(tester);
 
     expect(bridge.reads, greaterThan(reads));
-    expect(find.text(en.reliabilityAttention), findsOneWidget);
+    expect(find.text(en.reliabilityAttention, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -266,15 +276,15 @@ void main() {
       ..failReads = true;
     await pumpCenter(tester, stack, bridge: bridge);
 
-    expect(find.text(en.permissionCenterLoadFailed), findsOneWidget);
-    expect(find.byKey(const Key('permission_center_retry')), findsOneWidget);
+    expect(find.text(en.permissionCenterLoadFailed, skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const Key('permission_center_retry'), skipOffstage: false), findsOneWidget);
 
     bridge.failReads = false;
-    await tester.tap(find.byKey(const Key('permission_center_retry')));
+    await tester.tap(find.byKey(const Key('permission_center_retry'), skipOffstage: false));
     await pumpSettle(tester);
 
-    expect(find.text(en.permissionCenterLoadFailed), findsNothing);
-    expect(find.text(en.permNotificationsTitle), findsOneWidget);
+    expect(find.text(en.permissionCenterLoadFailed, skipOffstage: false), findsNothing);
+    expect(find.text(en.permNotificationsTitle, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
@@ -308,9 +318,9 @@ void main() {
       bridge: FakePermissionSystemBridge(snapshot: denied),
     );
 
-    expect(find.text(en.reliabilityMostly), findsOneWidget);
-    expect(find.text(en.permAlarmsNone), findsOneWidget);
-    expect(find.text(en.permStateDenied), findsNWidgets(2));
+    expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permAlarmsNone, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateDenied, skipOffstage: false), findsNWidgets(2));
     await finishWidgetTest(tester, stack);
   });
 
@@ -320,8 +330,8 @@ void main() {
     await stack.insertAlarm(label: 'Work');
     await pumpCenter(tester, stack);
 
-    expect(find.bySemanticsLabel(en.reliabilityReliable), findsWidgets);
-    expect(find.bySemanticsLabel(en.permStateReady), findsWidgets);
+    expect(find.bySemanticsLabel(en.reliabilityReliable, skipOffstage: false), findsWidgets);
+    expect(find.bySemanticsLabel(en.permStateReady, skipOffstage: false), findsWidgets);
     semantics.dispose();
     await finishWidgetTest(tester, stack);
   });
@@ -332,10 +342,10 @@ void main() {
     await pumpHome(tester, stack);
 
     expect(find.byTooltip(en.reliabilityHomeReady), findsOneWidget);
-    await tester.tap(find.byKey(const Key('home_reliability_button')));
+    await tester.tap(find.byKey(const Key('home_reliability_button'), skipOffstage: false));
     await pumpSettle(tester);
 
-    expect(find.text(en.permissionCenterTitle), findsOneWidget);
+    expect(find.text(en.permissionCenterTitle, skipOffstage: false), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 
