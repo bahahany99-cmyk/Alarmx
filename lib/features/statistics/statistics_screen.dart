@@ -9,10 +9,11 @@ import 'package:flutter/material.dart';
 /// Week summary over real history rows. Ar-first RTL, English-localized.
 ///
 /// Metrics come from [computeStatistics] over the live history stream, so the
-/// screen updates whenever history changes without polling. Durations use the
+/// screen updates whenever history changes without polling. Labels follow the
+/// live alarm stream too, so renames refresh immediately. Durations use the
 /// screen's own `M:SS` template; missing metrics render the localized
 /// unavailable label and never a manufactured `0:00`.
-class StatisticsScreen extends StatefulWidget {
+class StatisticsScreen extends StatelessWidget {
   const StatisticsScreen({
     super.key,
     required this.history,
@@ -23,25 +24,12 @@ class StatisticsScreen extends StatefulWidget {
   final AlarmRepository alarms;
 
   @override
-  State<StatisticsScreen> createState() => _StatisticsScreenState();
-}
-
-class _StatisticsScreenState extends State<StatisticsScreen> {
-  Future<List<Alarm>>? _alarmsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _alarmsFuture = widget.alarms.watchAlarms().first;
-  }
-
-  @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(strings.statisticsTitle)),
-      body: FutureBuilder<List<Alarm>>(
-        future: _alarmsFuture,
+      body: StreamBuilder<List<Alarm>>(
+        stream: alarms.watchAlarms(),
         builder: (
           BuildContext context,
           AsyncSnapshot<List<Alarm>> alarmSnapshot,
@@ -56,7 +44,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             for (final Alarm alarm in alarmSnapshot.data!) alarm.id: alarm,
           };
           return StreamBuilder<List<AlarmHistoryData>>(
-            stream: widget.history.watchAllHistory(),
+            stream: history.watchAllHistory(),
             builder: (
               BuildContext context,
               AsyncSnapshot<List<AlarmHistoryData>> snapshot,
@@ -82,27 +70,27 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       ),
     );
   }
+}
 
-  /// Display label for a history identity; never null (the calculator uses it
-  /// verbatim). Missing alarms keep their rows readable via the fallback.
-  String _alarmLabel(
-    BuildContext context,
-    AppStrings strings,
-    Map<int, Alarm> byId,
-    int? alarmId,
-  ) {
-    if (alarmId == null) {
-      return strings.historyUnknownAlarm;
-    }
-    final Alarm? alarm = byId[alarmId];
-    if (alarm == null) {
-      return '${strings.historyUnknownAlarm} #$alarmId';
-    }
-    final String? label = alarm.label?.trim().isEmpty ?? true
-        ? null
-        : alarm.label!.trim();
-    return label ?? formatAlarmTime(context, alarm.hour, alarm.minute);
+/// Display label for a history identity; never null (the calculator uses it
+/// verbatim). Missing alarms keep their rows readable via the fallback.
+String _alarmLabel(
+  BuildContext context,
+  AppStrings strings,
+  Map<int, Alarm> byId,
+  int? alarmId,
+) {
+  if (alarmId == null) {
+    return strings.historyUnknownAlarm;
   }
+  final Alarm? alarm = byId[alarmId];
+  if (alarm == null) {
+    return '${strings.historyUnknownAlarm} #$alarmId';
+  }
+  final String? label = alarm.label?.trim().isEmpty ?? true
+      ? null
+      : alarm.label!.trim();
+  return label ?? formatAlarmTime(context, alarm.hour, alarm.minute);
 }
 
 class _StatisticsLoaded extends StatelessWidget {
