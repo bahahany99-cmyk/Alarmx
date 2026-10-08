@@ -1,6 +1,5 @@
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
-import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/features/home/alarm_formatters.dart';
