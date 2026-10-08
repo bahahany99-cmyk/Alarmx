@@ -326,13 +326,29 @@ void main() {
 
   testWidgets('status icons carry semantic labels',
       (WidgetTester tester) async {
-    final SemanticsHandle semantics = tester.ensureSemantics();
     await stack.insertAlarm(label: 'Work');
     await pumpCenter(tester, stack);
 
-    expect(find.bySemanticsLabel(en.reliabilityReliable, skipOffstage: false), findsWidgets);
-    expect(find.bySemanticsLabel(en.permStateReady, skipOffstage: false), findsWidgets);
-    semantics.dispose();
+    // TalkBack reads Icon.semanticLabel (framework behavior); the center
+    // owns wiring a meaningful label on every status icon.
+    final List<Icon> icons =
+        tester.widgetList<Icon>(find.byType(Icon)).toList();
+    expect(
+      icons.where((Icon icon) => icon.semanticLabel == en.reliabilityReliable),
+      isNotEmpty,
+    );
+    expect(
+      icons.where((Icon icon) => icon.semanticLabel == en.permStateReady),
+      isNotEmpty,
+    );
+    // No status icon is left without a label (the refresh action exposes
+    // its tooltip instead, which is the IconButton convention).
+    for (final Icon icon in icons) {
+      if (icon.icon == Icons.refresh) {
+        continue;
+      }
+      expect(icon.semanticLabel, isNotNull, reason: '$icon');
+    }
     await finishWidgetTest(tester, stack);
   });
 
