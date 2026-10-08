@@ -43,6 +43,25 @@ jobs:
         run: |
           set -o pipefail
           flutter test --concurrency=2 2>&1 | tee /tmp/test.log
+      # TEMPORARY B4 probe: failing tests + context (removed before gating).
+      - name: TEMP fail-context probe
+        if: failure()
+        run: |
+          grep -a -A12 '❌' /tmp/test.log | head -80 | python3 -c "
+          import sys
+          chunk, size, n = [], 0, 0
+          def flush():
+              global n
+              msg = '%0A'.join(chunk)
+              print(f'::error title=fail-context-{n}::{msg}')
+              n += 1
+          for raw in sys.stdin:
+              line = raw.rstrip('\n').replace('%', '%25').replace('\r', '')
+              if size + len(line) > 2000:
+                  flush(); chunk, size = [], 0
+              chunk.append(line); size += len(line) + 1
+          if chunk: flush()
+          "
       # Workflow logs are not always reachable from every environment, so mirror
       # failure output into job annotations, which are available via the API.
       - name: Surface logs on failure
