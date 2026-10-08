@@ -103,7 +103,11 @@ void main() {
     expect(find.text(en.historyStatusSuccess), findsOneWidget);
     expect(find.text(en.historyStatusFailed), findsOneWidget);
     expect(find.text(en.historyStatusEmergency), findsOneWidget);
-    expect(find.textContaining('2026'), findsWidgets);
+    // Start line renders per entry: the separator is the screen's own stable
+    // template token (date wording itself is framework territory); the time
+    // half mirrors the proven '7:00' asserts from the editor tests.
+    expect(find.textContaining('·'), findsNWidgets(3));
+    expect(find.textContaining('6:0'), findsWidgets);
 
     await tester.tap(find.byKey(Key('history_tile_$okId')));
     await pumpSettle(tester);
