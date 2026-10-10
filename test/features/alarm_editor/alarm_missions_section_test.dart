@@ -285,7 +285,9 @@ void main() {
       await tester.tap(find.byKey(const Key('mission_config_save')));
       await pumpSettle(tester);
       expect(find.text('1. ${en.missionMemory}'), findsOneWidget);
-      expect(find.text(en.memoryHard), findsOneWidget);
+      // The row subtitle appends the requirement flag, so match by
+      // containment (same as the math-difficulty assertion below).
+      expect(find.textContaining(en.memoryHard), findsOneWidget);
 
       await saveAlarm(tester);
 
