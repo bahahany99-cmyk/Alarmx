@@ -11,7 +11,9 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -25,7 +27,8 @@ import androidx.core.app.NotificationCompat
  * Pipeline: `AlarmManager` → [AlarmReceiver] → (`ContextCompat.startForegroundService`)
  * → this service → `startForeground()` → ongoing ringing notification (with a
  * full-screen intent opening the Flutter mission screen via [MainActivity]) +
- * default alarm ringtone + repeating vibration. On Android 14+ the
+ * default alarm ringtone (looped until stopped: native looping on API 28+, a
+ * completion watcher below) + repeating vibration. On Android 14+ the
  * full-screen launch is attached only when the full-screen-intent permission
  * is granted; otherwise the same high-priority notification still posts and
  * tapping it opens the mission screen.
@@ -97,6 +100,15 @@ class AlarmForegroundService : Service() {
         private const val WAKE_LOCK_TIMEOUT_MS = 10L * 60L * 1000L
 
         /**
+         * Re-trigger poll interval for API 26-27 (see [startRingtone]): how
+         * often the loop watcher checks whether the one-shot ringtone
+         * finished while the ring is still active. Short enough to keep the
+         * gap between repeats barely noticeable; the watcher is removed the
+         * moment [stopRinging] runs, so no callback can outlive the ring.
+         */
+        private const val LOOP_POLL_INTERVAL_MS = 250L
+
+        /**
          * Id of the alarm currently ringing, or null when the service is
          * idle. Written by [startRinging]/[stopRinging] and read by the
          * scheduler channel's `isRingingAlarm` query, so Dart
@@ -115,6 +127,19 @@ class AlarmForegroundService : Service() {
     private var ringLabel: String? = null
     private var vibrationEnabled = true
     private var ringtone: Ringtone? = null
+    /**
+     * Serializes ringtone replay against [stopRinging]: the API 26-27 loop
+     * watcher checks state and replays only while holding this lock, and
+     * the stop path disarms the watcher and clears the player under the
+     * same lock, so a replay can never slip in after (or during) a stop.
+     */
+    private val ringtoneLock = Any()
+    /**
+     * Loop watcher for API 26-27 only ([Ringtone.setLooping] needs API 28+).
+     * Both are null on newer releases and whenever no ring is active.
+     */
+    private var loopHandler: Handler? = null
+    private var loopWatcher: Runnable? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -323,11 +348,54 @@ class AlarmForegroundService : Service() {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
             ringtone = player
+            // A single play() ends when the tone file ends (~10s on tested
+            // devices), leaving vibration-only ringing. Loop instead:
+            // native looping on API 28+, a completion watcher below.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                player.isLooping = true
+            }
             player.play()
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                startLoopWatcher(player)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Ringtone playback failed; continuing without sound.", e)
             ringtone = null
         }
+    }
+
+    /**
+     * Manual loop for API 26-27, where [Ringtone.setLooping] does not exist.
+     * Re-posts itself every [LOOP_POLL_INTERVAL_MS] while the ring is
+     * active, replaying [player] whenever it finished naturally. The
+     * state-check-plus-replay-plus-repost runs atomically under
+     * [ringtoneLock] (see [stopRinging]), so it can never interleave with
+     * the stop: either the tick fully finishes before the stop disarms it
+     * (and its repost is removed there) or it sees the cleared state and
+     * returns without replaying or reposting, ending the chain.
+     */
+    private fun startLoopWatcher(player: Ringtone) {
+        val handler = Handler(Looper.getMainLooper())
+        loopHandler = handler
+        val watcher = object : Runnable {
+            override fun run() {
+                synchronized(ringtoneLock) {
+                    if (!isRinging || ringtone !== player) {
+                        return
+                    }
+                    try {
+                        if (!player.isPlaying) {
+                            player.play()
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Ringtone replay failed.", e)
+                    }
+                    handler.postDelayed(this, LOOP_POLL_INTERVAL_MS)
+                }
+            }
+        }
+        loopWatcher = watcher
+        handler.postDelayed(watcher, LOOP_POLL_INTERVAL_MS)
     }
 
     private fun startVibration() {
@@ -387,12 +455,30 @@ class AlarmForegroundService : Service() {
         ringAlarmId = -1
         ringTriggerAtMillis = null
         ringingAlarmId = null
-        try {
-            ringtone?.takeIf { it.isPlaying }?.stop()
-        } catch (e: Exception) {
-            Log.w(TAG, "Error stopping ringtone.", e)
+        // First: disarm the API 26-27 loop watcher so no replay can fire
+        // after this stop. Removal plus the player stop/clear below run
+        // under [ringtoneLock], matching the watcher's atomic
+        // check-plus-replay-plus-repost, so the two can never interleave
+        // (see [startLoopWatcher]). Idempotent: null-safe on repeat calls.
+        synchronized(ringtoneLock) {
+            try {
+                val handler = loopHandler
+                val watcher = loopWatcher
+                if (handler != null && watcher != null) {
+                    handler.removeCallbacks(watcher)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error removing ringtone loop watcher.", e)
+            }
+            loopHandler = null
+            loopWatcher = null
+            try {
+                ringtone?.takeIf { it.isPlaying }?.stop()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping ringtone.", e)
+            }
+            ringtone = null
         }
-        ringtone = null
         try {
             vibrator?.cancel()
         } catch (e: Exception) {
