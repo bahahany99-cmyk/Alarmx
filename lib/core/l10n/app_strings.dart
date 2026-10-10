@@ -97,8 +97,11 @@ class AppStrings {
   String get soundLabel => text('soundLabel');
   String get soundDefault => text('soundDefault');
   String get soundCustom => text('soundCustom');
-  String get soundUriLabel => text('soundUriLabel');
-  String get soundUriHint => text('soundUriHint');
+  String get soundPickFile => text('soundPickFile');
+  String get soundPickRingtone => text('soundPickRingtone');
+  String get soundCustomSelected => text('soundCustomSelected');
+  String get soundChange => text('soundChange');
+  String get soundRemove => text('soundRemove');
   String get soundFutureCaption => text('soundFutureCaption');
   String get volumeLabel => text('volumeLabel');
   String get vibrationLabel => text('vibrationLabel');
@@ -370,9 +373,12 @@ class AppStrings {
     'soundLabel': 'الصوت',
     'soundDefault': 'النغمة الافتراضية',
     'soundCustom': 'صوت مخصص',
-    'soundUriLabel': 'رابط الصوت',
-    'soundUriHint': 'مثال: content://...',
-    'soundFutureCaption': 'يُحفظ الآن، ويعمل في تحديث الصوت القادم',
+    'soundPickFile': 'اختيار ملف صوتي',
+    'soundPickRingtone': 'نغمات النظام',
+    'soundCustomSelected': 'تم اختيار صوت مخصص',
+    'soundChange': 'تغيير',
+    'soundRemove': 'إزالة',
+    'soundFutureCaption': 'يشغّل الصوت المختار، أو النغمة الافتراضية عند التعذّر',
     'volumeLabel': 'مستوى الصوت',
     'vibrationLabel': 'الاهتزاز',
     'fadeInLabel': 'تصاعد الصوت تدريجيًا',
@@ -640,9 +646,12 @@ class AppStrings {
     'soundLabel': 'Sound',
     'soundDefault': 'Default ringtone',
     'soundCustom': 'Custom sound',
-    'soundUriLabel': 'Sound link (URI)',
-    'soundUriHint': 'e.g. content://...',
-    'soundFutureCaption': 'Saved now; takes effect in the coming sound update',
+    'soundPickFile': 'Choose audio file',
+    'soundPickRingtone': 'System ringtones',
+    'soundCustomSelected': 'Custom sound selected',
+    'soundChange': 'Change',
+    'soundRemove': 'Remove',
+    'soundFutureCaption': 'Plays the picked sound; falls back to the default tone',
     'volumeLabel': 'Volume',
     'vibrationLabel': 'Vibration',
     'fadeInLabel': 'Fade in gradually',

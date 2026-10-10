@@ -14,8 +14,10 @@
 //     never schedules.
 //   - Snooze fields are configuration + persistence only; snooze
 //     execution belongs to the later Snooze phase (caption says so).
-//   - Fade-in and custom-sound values are stored config; the current
-//     native service still plays the default ringtone (captions say so).
+//   - Fade-in values are stored config (the caption says the service
+//     does not consume them yet). Custom sounds picked here ARE consumed:
+//     the coordinator freezes the URI into the schedule and the native
+//     service plays it first, falling back to the default tone.
 //   - `strictMode` is preserved without a control; the mission section
 //     edits in-memory drafts and saves them together with the alarm
 //     (pre-validated before the alarm row is written, so an invalid
@@ -29,6 +31,7 @@ import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
+import 'package:alarmx/features/alarm_editor/audio_picker_gate.dart';
 import 'package:alarmx/features/alarm_editor/editor_card.dart';
 import 'package:alarmx/features/alarm_editor/mission_section.dart';
 import 'package:alarmx/features/alarm_editor/time_wheel_picker.dart';
@@ -46,6 +49,7 @@ class AlarmEditorScreen extends StatefulWidget {
     required this.missions,
     required this.pinService,
     required this.settings,
+    this.audioPicker = const MethodChannelAudioPicker(),
   }) : alarmId = null;
 
   const AlarmEditorScreen.edit({
@@ -55,6 +59,7 @@ class AlarmEditorScreen extends StatefulWidget {
     required this.pinService,
     required this.settings,
     required int this.alarmId,
+    this.audioPicker = const MethodChannelAudioPicker(),
   });
 
   final AlarmController controller;
@@ -67,6 +72,9 @@ class AlarmEditorScreen extends StatefulWidget {
 
   /// Settings source for the Strict default (create mode).
   final AppSettingsRepository settings;
+
+  /// System pickers for custom alarm sounds (injectable for tests).
+  final AudioPickerGate audioPicker;
 
   /// Null for create, the stored id for edit.
   final int? alarmId;
@@ -99,6 +107,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           missions: widget.missions,
           pinService: widget.pinService,
           settings: widget.settings,
+          audioPicker: widget.audioPicker,
           existing: null,
         ),
       );
@@ -139,6 +148,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             missions: widget.missions,
             pinService: widget.pinService,
             settings: widget.settings,
+            audioPicker: widget.audioPicker,
             existing: alarm,
           ),
         );
@@ -173,6 +183,7 @@ class _EditorForm extends StatefulWidget {
     required this.missions,
     required this.pinService,
     required this.settings,
+    required this.audioPicker,
     required this.existing,
   });
 
@@ -180,6 +191,7 @@ class _EditorForm extends StatefulWidget {
   final MissionService missions;
   final PinService pinService;
   final AppSettingsRepository settings;
+  final AudioPickerGate audioPicker;
   final Alarm? existing;
 
   @override
@@ -192,8 +204,6 @@ class _EditorFormState extends State<_EditorForm> {
       : AlarmDraft.fromAlarm(widget.existing!);
   late final TextEditingController _labelController =
       TextEditingController(text: _draft.label);
-  late final TextEditingController _soundUriController =
-      TextEditingController(text: _draft.soundUri);
   bool _saving = false;
 
   /// Mission drafts edited by the section; empty in create mode, loaded
@@ -326,7 +336,6 @@ class _EditorFormState extends State<_EditorForm> {
   @override
   void dispose() {
     _labelController.dispose();
-    _soundUriController.dispose();
     super.dispose();
   }
 
@@ -631,7 +640,7 @@ class _EditorFormState extends State<_EditorForm> {
               const SizedBox(height: 12),
               _SoundCard(
                 draft: _draft,
-                soundUriController: _soundUriController,
+                audioPicker: widget.audioPicker,
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 12),
@@ -877,22 +886,69 @@ class _RepeatCard extends StatelessWidget {
   }
 }
 
-/// Sound type + optional URI + volume.
-class _SoundCard extends StatelessWidget {
+/// Sound type + custom-sound pickers + volume.
+///
+/// Custom sounds come from two system pickers (local audio file, system
+/// ringtone); the picked URI is stored opaquely on the draft and frozen
+/// into the schedule at save time. A cancelled/failed pick keeps the
+/// previous sound: nothing is ever cleared implicitly.
+class _SoundCard extends StatefulWidget {
   const _SoundCard({
     required this.draft,
-    required this.soundUriController,
+    required this.audioPicker,
     required this.onChanged,
   });
 
   final AlarmDraft draft;
-  final TextEditingController soundUriController;
+  final AudioPickerGate audioPicker;
   final VoidCallback onChanged;
+
+  @override
+  State<_SoundCard> createState() => _SoundCardState();
+}
+
+class _SoundCardState extends State<_SoundCard> {
+  bool _picking = false;
+
+  Future<void> _pick(Future<String?> Function() action) async {
+    if (_picking) {
+      return;
+    }
+    setState(() {
+      _picking = true;
+    });
+    final String? uri;
+    try {
+      uri = await action();
+    } catch (_) {
+      // Defensive: the gate contract is never-throw, but a custom
+      // implementation must not crash the editor either.
+      if (mounted) {
+        setState(() {
+          _picking = false;
+        });
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _picking = false;
+      if (uri != null && uri.trim().isNotEmpty) {
+        widget.draft.soundType = kCustomSoundType;
+        widget.draft.soundUri = uri.trim();
+      }
+    });
+    widget.onChanged();
+  }
 
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
     final ThemeData theme = Theme.of(context);
+    final AlarmDraft draft = widget.draft;
+    final bool hasCustom = draft.isCustomSound && draft.soundUri.isNotEmpty;
     return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -915,27 +971,95 @@ class _SoundCard extends StatelessWidget {
               selected: <bool>{draft.isCustomSound},
               onSelectionChanged: (Set<bool> selected) {
                 draft.setCustomSound(selected.first);
-                if (!draft.isCustomSound) {
-                  soundUriController.text = '';
-                }
-                onChanged();
+                widget.onChanged();
               },
             ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('editor_sound_uri_field'),
-              controller: soundUriController,
-              enabled: draft.isCustomSound,
-              decoration: InputDecoration(
-                labelText: strings.soundUriLabel,
-                hintText: strings.soundUriHint,
-                border: const OutlineInputBorder(),
-              ),
-              textInputAction: TextInputAction.done,
-              onChanged: (String value) {
-                draft.soundUri = value;
-              },
-            ),
+            if (draft.isCustomSound) ...<Widget>[
+              const SizedBox(height: 12),
+              if (hasCustom)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.audio_file_outlined,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          strings.soundCustomSelected,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        key: const Key('editor_sound_change'),
+                        onPressed: _picking
+                            ? null
+                            : () => setState(() {
+                                  draft.soundUri = '';
+                                }),
+                        child: Text(strings.soundChange),
+                      ),
+                      TextButton(
+                        key: const Key('editor_sound_remove'),
+                        onPressed: _picking
+                            ? null
+                            : () {
+                                draft.setCustomSound(false);
+                                widget.onChanged();
+                              },
+                        child: Text(strings.soundRemove),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    FilledButton.tonalIcon(
+                      key: const Key('editor_sound_pick_file'),
+                      onPressed: _picking
+                          ? null
+                          : () => _pick(widget.audioPicker.pickLocalAudio),
+                      icon: _picking
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.folder_open),
+                      label: Text(strings.soundPickFile),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      key: const Key('editor_sound_pick_ringtone'),
+                      onPressed: _picking
+                          ? null
+                          : () => _pick(
+                                () => widget.audioPicker.pickSystemRingtone(
+                                  existingUri: draft.soundUri.isEmpty
+                                      ? null
+                                      : draft.soundUri,
+                                ),
+                              ),
+                      icon: const Icon(Icons.music_note_outlined),
+                      label: Text(strings.soundPickRingtone),
+                    ),
+                  ],
+                ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
@@ -949,7 +1073,7 @@ class _SoundCard extends StatelessWidget {
                     label: '${draft.volume}',
                     onChanged: (double value) {
                       draft.volume = value.round();
-                      onChanged();
+                      widget.onChanged();
                     },
                   ),
                 ),

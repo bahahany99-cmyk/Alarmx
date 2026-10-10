@@ -52,6 +52,13 @@ class AlarmReceiver : BroadcastReceiver() {
         /** Fire-config extra key carrying the vibration flag. */
         const val EXTRA_VIBRATION_ENABLED = "vibration_enabled"
 
+        /**
+         * Optional fire-config extra key carrying the custom sound URI
+         * string. Absent for default-sound alarms; the service falls back
+         * to the default tone whenever this is missing or unreadable.
+         */
+        const val EXTRA_SOUND_URI = "sound_uri"
+
         private const val FALLBACK_CHANNEL_ID = "alarmx_missed_channel"
         private const val FALLBACK_CHANNEL_NAME = "AlarmX Alerts"
         private const val FALLBACK_NOTIFICATION_ID = 3000
@@ -94,6 +101,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     AlarmForegroundService.EXTRA_VIBRATION_ENABLED,
                     intent.getBooleanExtra(EXTRA_VIBRATION_ENABLED, true),
                 )
+                intent.getStringExtra(EXTRA_SOUND_URI)?.let { soundUri ->
+                    putExtra(AlarmForegroundService.EXTRA_SOUND_URI, soundUri)
+                }
             }
         }
         try {

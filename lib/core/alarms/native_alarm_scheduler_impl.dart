@@ -6,8 +6,9 @@
 //
 // Method names + argument shapes (must match MainActivity.kt):
 //   - "scheduleExactAlarm"  args: { "alarmId": int, "triggerAtMillis": long,
-//       plus, for persisted alarms, "label": String? and
-//       "vibrationEnabled": bool from [AlarmFireConfig] }
+//       plus, for persisted alarms, "label": String?,
+//       "vibrationEnabled": bool, and "soundUri": String? from
+//       [AlarmFireConfig] }
 //   - "cancelAlarm"         args: { "alarmId": int }
 //   - "canScheduleExactAlarms"  args: {}
 //   - "isRingingAlarm"      args: { "alarmId": int } -> bool

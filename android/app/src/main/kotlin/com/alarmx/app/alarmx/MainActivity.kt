@@ -139,12 +139,42 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Retained scheduler handler so the picker host (registered below,
+     * after the engine attaches) can be attached to it. Null until
+     * [configureFlutterEngine] runs.
+     */
+    private var schedulerHandler: AlarmSchedulerChannelHandler? = null
+
+    /**
+     * Activity-result host for the alarm-sound pickers, built in
+     * [onCreate]. Null until then, which also covers the headless boot
+     * engine path that never builds one.
+     */
+    private var audioPickerHost: AudioPickerHost? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         stashRingingLaunch(intent, clearWhenNormal = true)
         if (intent?.getBooleanExtra(EXTRA_RINGING, false) == true) {
             showWhenLockedAndTurnScreenOn()
         }
+        val host = AudioPickerHost(this)
+        audioPickerHost = host
+        schedulerHandler?.audioPickerHost = host
+    }
+
+    @Deprecated(
+        "Framework callback: FlutterActivity extends the framework " +
+            "Activity, which has no Activity Result API.",
+    )
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ) {
+        super.onActivityResult(requestCode, resultCode, data)
+        audioPickerHost?.dispatch(requestCode, resultCode, data)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -180,6 +210,8 @@ class MainActivity : FlutterActivity() {
         val alarmManager =
             getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val schedulerHandler = AlarmSchedulerChannelHandler(this, alarmManager)
+        this.schedulerHandler = schedulerHandler
+        audioPickerHost?.let { schedulerHandler.audioPickerHost = it }
 
         val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,

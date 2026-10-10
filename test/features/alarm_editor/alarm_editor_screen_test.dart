@@ -1,6 +1,7 @@
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/features/alarm_editor/audio_picker_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +10,28 @@ import '../../support/test_doubles.dart';
 // Editor tests: real in-memory stack, English locale. Save outcomes are
 // asserted through repository + fake scheduler state; result-message
 // mapping is covered by the controller tests.
+
+/// Scripted [AudioPickerGate]: canned URIs per picker (null = cancel).
+class FakeAudioPickerGate implements AudioPickerGate {
+  FakeAudioPickerGate({this.fileResult, this.ringtoneResult});
+
+  final String? fileResult;
+  final String? ringtoneResult;
+  int fileCalls = 0;
+  int ringtoneCalls = 0;
+
+  @override
+  Future<String?> pickLocalAudio() async {
+    fileCalls++;
+    return fileResult;
+  }
+
+  @override
+  Future<String?> pickSystemRingtone({String? existingUri}) async {
+    ringtoneCalls++;
+    return ringtoneResult;
+  }
+}
 
 /// Vertical drag distance that advances a time wheel exactly one detent.
 const double kTimeWheelDrag = 48;
@@ -215,33 +238,102 @@ void main() {
       await finishWidgetTest(tester, stack);
     });
 
-    testWidgets('custom sound URI is stored', (WidgetTester tester) async {
-      await pumpEditor(tester, stack);
-      await tapVisible(tester, find.text(en.soundCustom));
-      await tester.enterText(
-        find.byKey(const Key('editor_sound_uri_field')),
-        'content://tones/x',
+    testWidgets('picked audio file is stored and frozen', (
+      WidgetTester tester,
+    ) async {
+      final FakeAudioPickerGate picker = FakeAudioPickerGate(
+        fileResult: 'content://tones/x',
       );
-      await tester.pump();
+      await pumpEditor(tester, stack, audioPicker: picker);
+      await tapVisible(tester, find.text(en.soundCustom));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('editor_sound_pick_file')),
+      );
+
+      expect(find.text(en.soundCustomSelected), findsOneWidget);
+      expect(picker.fileCalls, 1);
       await tester.tap(find.byKey(const Key('editor_save_button')));
       await pumpSettle(tester);
 
       final Alarm row = (await alarms()).single;
       expect(row.soundUri, 'content://tones/x');
       expect(row.soundType, 'custom');
+      expect(
+        stack.scheduler.scheduledConfigs.single?.soundUri,
+        'content://tones/x',
+      );
       await finishWidgetTest(tester, stack);
     });
 
-    testWidgets('back to default clears the URI', (WidgetTester tester) async {
-      await pumpEditor(tester, stack);
-      await tapVisible(tester, find.text(en.soundCustom));
-      await tester.enterText(
-        find.byKey(const Key('editor_sound_uri_field')),
-        'content://tones/x',
+    testWidgets('picked system ringtone is stored', (
+      WidgetTester tester,
+    ) async {
+      final FakeAudioPickerGate picker = FakeAudioPickerGate(
+        ringtoneResult: 'content://ringtones/alarm',
       );
-      await tapVisible(tester, find.text(en.soundDefault));
+      await pumpEditor(tester, stack, audioPicker: picker);
+      await tapVisible(tester, find.text(en.soundCustom));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('editor_sound_pick_ringtone')),
+      );
 
-      expect(find.text('content://tones/x'), findsNothing);
+      expect(find.text(en.soundCustomSelected), findsOneWidget);
+      expect(picker.ringtoneCalls, 1);
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      final Alarm row = (await alarms()).single;
+      expect(row.soundUri, 'content://ringtones/alarm');
+      expect(row.soundType, 'custom');
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('cancelled pick keeps the choice buttons', (
+      WidgetTester tester,
+    ) async {
+      await pumpEditor(
+        tester,
+        stack,
+        audioPicker: FakeAudioPickerGate(),
+      );
+      await tapVisible(tester, find.text(en.soundCustom));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('editor_sound_pick_file')),
+      );
+
+      expect(find.text(en.soundCustomSelected), findsNothing);
+      expect(
+        find.byKey(const Key('editor_sound_pick_file')),
+        findsOneWidget,
+      );
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('remove clears back to default', (WidgetTester tester) async {
+      final FakeAudioPickerGate picker = FakeAudioPickerGate(
+        fileResult: 'content://tones/x',
+      );
+      await pumpEditor(tester, stack, audioPicker: picker);
+      await tapVisible(tester, find.text(en.soundCustom));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('editor_sound_pick_file')),
+      );
+      await tapVisible(
+        tester,
+        find.byKey(const Key('editor_sound_remove')),
+      );
+
+      expect(find.text(en.soundCustomSelected), findsNothing);
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      final Alarm row = (await alarms()).single;
+      expect(row.soundUri, isNull);
+      expect(row.soundType, 'default');
       await finishWidgetTest(tester, stack);
     });
 

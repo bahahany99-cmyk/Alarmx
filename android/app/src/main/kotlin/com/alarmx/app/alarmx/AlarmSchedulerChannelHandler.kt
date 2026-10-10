@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.media.RingtoneManager
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
@@ -24,7 +25,16 @@ import io.flutter.plugin.common.MethodChannel
  * Channel name: `"com.alarmx.app.alarmx/alarm_scheduler"`
  * Methods:
  *   - `scheduleExactAlarm`  args: `{ "alarmId": Int, "triggerAtMillis": Long,
- *       plus for persisted alarms "label": String? and "vibrationEnabled": Boolean }`
+ *       plus for persisted alarms "label": String?, "vibrationEnabled": Boolean,
+ *       and "soundUri": String? }`
+ *   - `pickAudioFile`  args: `{}`: opens the system file picker
+ *     (`ACTION_OPEN_DOCUMENT`, local audio) for a custom alarm sound.
+ *     Returns the picked content URI string, or null on cancel /
+ *     failure / headless engine. A persistable read grant is taken so
+ *     the ring (which runs without any activity) can still read it.
+ *   - `pickSystemRingtone`  args: `{ "existingUri": String? }`: opens
+ *     the system ringtone picker (alarm type). Returns the picked
+ *     ringtone URI string, or null on cancel / failure / headless.
  *   - `cancelAlarm`         args: `{ "alarmId": Int }`
  *   - `canScheduleExactAlarms`  args: `{}`
  *   - `getRingingLaunch`  args: `{}`: the pending Flutter ring launch
@@ -63,6 +73,13 @@ class AlarmSchedulerChannelHandler(
     }
 
     /**
+     * Activity-result host for the sound pickers, attached by
+     * [MainActivity]. Null on the headless boot engine, where the
+     * picker methods answer null (no foreground activity exists).
+     */
+    var audioPickerHost: AudioPickerHost? = null
+
+    /**
      * Handles one scheduler call, reporting argument problems as
      * `INVALID_ARGS` and unexpected failures as `NATIVE_ERROR`. Unknown
      * methods answer `notImplemented` so hosts can layer their own methods
@@ -91,11 +108,13 @@ class AlarmSchedulerChannelHandler(
                     val fireLabel = call.argument<String>("label")
                     val fireVibration =
                         call.argument<Boolean>("vibrationEnabled") ?: true
+                    val fireSoundUri = call.argument<String>("soundUri")
                     scheduleExact(
                         alarmId,
                         triggerAtMillis,
                         fireLabel,
                         fireVibration,
+                        fireSoundUri,
                         isPersisted,
                     )
                     result.success(null)
@@ -183,6 +202,17 @@ class AlarmSchedulerChannelHandler(
                     result.success(openSettingsTarget(target))
                 }
 
+                "pickAudioFile" -> {
+                    pickAudioFile(result)
+                }
+
+                "pickSystemRingtone" -> {
+                    pickSystemRingtone(
+                        call.argument<String>("existingUri"),
+                        result,
+                    )
+                }
+
                 else -> result.notImplemented()
             }
         } catch (t: Throwable) {
@@ -204,6 +234,7 @@ class AlarmSchedulerChannelHandler(
         triggerAtMillis: Long,
         fireLabel: String?,
         fireVibration: Boolean,
+        fireSoundUri: String?,
         isPersisted: Boolean,
     ) {
         if (isPersisted) {
@@ -214,6 +245,7 @@ class AlarmSchedulerChannelHandler(
             triggerAtMillis,
             fireLabel,
             fireVibration,
+            fireSoundUri,
             isPersisted,
         )
         alarmManager.setExactAndAllowWhileIdle(
@@ -441,6 +473,7 @@ class AlarmSchedulerChannelHandler(
         triggerAtMillis: Long? = null,
         fireLabel: String? = null,
         fireVibration: Boolean = true,
+        fireSoundUri: String? = null,
         isPersisted: Boolean = false,
     ): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -452,6 +485,9 @@ class AlarmSchedulerChannelHandler(
                     putExtra(AlarmReceiver.EXTRA_LABEL, fireLabel)
                 }
                 putExtra(AlarmReceiver.EXTRA_VIBRATION_ENABLED, fireVibration)
+                if (!fireSoundUri.isNullOrEmpty()) {
+                    putExtra(AlarmReceiver.EXTRA_SOUND_URI, fireSoundUri)
+                }
             }
         }
         return PendingIntent.getBroadcast(
@@ -460,5 +496,104 @@ class AlarmSchedulerChannelHandler(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /**
+     * Opens the system file picker for a local audio file. Local-only:
+     * an alarm must ring offline, so cloud-backed documents (which may
+     * need a network fetch at ring time) are excluded. A persistable
+     * read grant is taken on the picked URI because the ring runs with
+     * no activity and possibly after a reboot. Answers the picked URI
+     * string, or null on cancel/failure/headless.
+     */
+    private fun pickAudioFile(result: MethodChannel.Result) {
+        val host = audioPickerHost
+        if (host == null) {
+            result.success(null)
+            return
+        }
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "audio/*"
+            putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+            )
+        }
+        try {
+            host.launchOpenDocument(intent) { data ->
+                val uri = data?.data
+                if (uri == null) {
+                    result.success(null)
+                    return@launchOpenDocument
+                }
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                } catch (t: Throwable) {
+                    // Some providers deny persistable grants; the
+                    // transient read grant still works until reboot, and
+                    // playback falls back to the default tone past that.
+                    Log.w("AlarmX", "Persistable audio grant denied; using transient grant.")
+                }
+                result.success(uri.toString())
+            }
+        } catch (t: Throwable) {
+            Log.w("AlarmX", "Audio file picker failed.", t)
+            result.success(null)
+        }
+    }
+
+    /**
+     * Opens the system ringtone picker (alarm type), preselecting
+     * [existingUri] when it parses. System tones need no persistable
+     * grant (they resolve through the platform). Answers the picked
+     * URI string, or null on cancel/failure/headless.
+     */
+    private fun pickSystemRingtone(
+        existingUri: String?,
+        result: MethodChannel.Result,
+    ) {
+        val host = audioPickerHost
+        if (host == null) {
+            result.success(null)
+            return
+        }
+        val existing = try {
+            if (existingUri.isNullOrEmpty()) null else Uri.parse(existingUri)
+        } catch (_: Exception) {
+            null
+        }
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Alarm sound")
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existing)
+        }
+        try {
+            host.launchRingtonePicker(intent) { data ->
+                val picked: Uri? = if (data == null) {
+                    null
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    data.getParcelableExtra(
+                        RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                        Uri::class.java,
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    data.getParcelableExtra<Uri>(
+                        RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                    )
+                }
+                result.success(picked?.toString())
+            }
+        } catch (t: Throwable) {
+            Log.w("AlarmX", "System ringtone picker failed.", t)
+            result.success(null)
+        }
     }
 }

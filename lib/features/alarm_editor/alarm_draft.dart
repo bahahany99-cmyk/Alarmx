@@ -21,9 +21,9 @@
 //   - [nextOccurrence] also feeds the editor's read-only "time
 //     remaining" preview; the preview computes, it never schedules.
 //   - `soundType` 'default' vs 'custom': 'custom' is written only together
-//     with a non-empty `soundUri`. The native service does not consume
-//     either yet (default ringtone pipeline); both are stored config for
-//     the later audio phase.
+//     with a non-empty `soundUri`. The coordinator freezes the URI into
+//     the schedule and the native service plays it first, falling back
+//     to the default tone on any failure.
 
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/models/models.dart';

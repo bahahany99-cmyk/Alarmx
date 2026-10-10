@@ -100,6 +100,8 @@ void main() {
     RepeatType repeatType = RepeatType.daily,
     DateTime? onceDate,
     RepeatDays? repeatDays,
+    String? soundUri,
+    String soundType = 'default',
   }) {
     return alarms.createAlarm(
       AlarmsCompanion(
@@ -111,6 +113,8 @@ void main() {
         repeatType: Value(repeatType.dbValue),
         onceDate: Value(onceDate),
         repeatDays: Value(repeatDays?.mask),
+        soundUri: Value(soundUri),
+        soundType: Value(soundType),
       ),
     );
   }
@@ -383,6 +387,21 @@ void main() {
       final AlarmFireConfig config = scheduler.scheduledConfigs.single!;
       expect(config.label, isNull);
       expect(config.vibrationEnabled, isTrue);
+      expect(config.soundUri, isNull);
+    });
+
+    test('freezes the stored custom sound URI', () async {
+      final int id = await insertAlarm(
+        repeatType: RepeatType.once,
+        onceDate: DateTime(2026, 10, 6),
+        soundUri: 'content://tones/x',
+        soundType: 'custom',
+      );
+
+      await coordinator.scheduleAlarm(id, now: monday);
+
+      final AlarmFireConfig config = scheduler.scheduledConfigs.single!;
+      expect(config.soundUri, 'content://tones/x');
     });
   });
 

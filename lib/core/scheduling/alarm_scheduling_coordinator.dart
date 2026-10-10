@@ -129,6 +129,7 @@ class AlarmSchedulingCoordinator {
         fireConfig: AlarmFireConfig(
           label: alarm.label,
           vibrationEnabled: alarm.vibrationEnabled,
+          soundUri: alarm.soundUri,
         ),
       );
     } catch (e) {
@@ -274,6 +275,7 @@ class AlarmSchedulingCoordinator {
         fireConfig: AlarmFireConfig(
           label: alarm.label,
           vibrationEnabled: alarm.vibrationEnabled,
+          soundUri: alarm.soundUri,
         ),
       );
     } catch (e) {
@@ -380,6 +382,7 @@ class AlarmSchedulingCoordinator {
         fireConfig: AlarmFireConfig(
           label: alarm.label,
           vibrationEnabled: alarm.vibrationEnabled,
+          soundUri: alarm.soundUri,
         ),
       );
     } catch (e) {
@@ -561,6 +564,7 @@ class AlarmSchedulingCoordinator {
         fireConfig: AlarmFireConfig(
           label: alarm.label,
           vibrationEnabled: alarm.vibrationEnabled,
+          soundUri: alarm.soundUri,
         ),
       );
     } catch (e) {

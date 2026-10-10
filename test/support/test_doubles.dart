@@ -29,6 +29,7 @@ import 'package:alarmx/features/missions/permissions/camera_permission.dart';
 import 'package:alarmx/features/onboarding/notification_permission_gate.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
+import 'package:alarmx/features/alarm_editor/audio_picker_gate.dart';
 import 'package:alarmx/features/home/home_screen.dart';
 import 'package:alarmx/main.dart';
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
@@ -144,6 +145,8 @@ class TestStack {
     DateTime? onceDate,
     int? repeatDays,
     bool vibrationEnabled = true,
+    String? soundUri,
+    String soundType = 'default',
   }) {
     return repository.createAlarm(
       AlarmsCompanion.insert(
@@ -155,6 +158,8 @@ class TestStack {
         repeatType: Value(repeatType.dbValue),
         onceDate: Value(onceDate),
         repeatDays: Value(repeatDays),
+        soundUri: Value(soundUri),
+        soundType: Value(soundType),
       ),
     );
   }
@@ -384,6 +389,7 @@ Future<void> pumpEditor(
   TestStack stack, {
   String language = AppLanguage.english,
   int? alarmId,
+  AudioPickerGate? audioPicker,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -396,12 +402,16 @@ Future<void> pumpEditor(
               missions: stack.missions,
               pinService: stack.pinService,
               settings: stack.settings,
+              audioPicker:
+                  audioPicker ?? const MethodChannelAudioPicker(),
             )
           : AlarmEditorScreen.edit(
               controller: stack.controller,
               missions: stack.missions,
               pinService: stack.pinService,
               settings: stack.settings,
+              audioPicker:
+                  audioPicker ?? const MethodChannelAudioPicker(),
               alarmId: alarmId,
             ),
     ),

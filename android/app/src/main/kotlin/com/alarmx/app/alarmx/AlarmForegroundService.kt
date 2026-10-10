@@ -44,8 +44,10 @@ import androidx.core.app.NotificationCompat
  * and idempotent.
  *
  * Fire config: a start may carry [EXTRA_LABEL] (shown in the notification,
- * default text otherwise) and [EXTRA_VIBRATION_ENABLED] (default true).
- * Starts without them — every legacy test alarm — behave exactly as before.
+ * default text otherwise), [EXTRA_VIBRATION_ENABLED] (default true), and
+ * [EXTRA_SOUND_URI] (custom alarm sound; default tone when missing or
+ * unreadable). Starts without them — every legacy test alarm — behave
+ * exactly as before.
  * A persisted start additionally carries [EXTRA_TRIGGER_AT_MILLIS], the
  * schedule token the stop handoff reports back so Dart can complete or
  * chain that exact schedule.
@@ -69,6 +71,13 @@ class AlarmForegroundService : Service() {
 
         /** Start extra carrying the vibration flag (default true). */
         const val EXTRA_VIBRATION_ENABLED = "vibration_enabled"
+
+        /**
+         * Optional start extra carrying the custom sound URI string. The
+         * URI was frozen at schedule time and read through the
+         * ContentResolver; any failure plays the default tone instead.
+         */
+        const val EXTRA_SOUND_URI = "sound_uri"
 
         /**
          * Start extra carrying the fired schedule token (millis). Present on
@@ -127,6 +136,7 @@ class AlarmForegroundService : Service() {
     private var ringTriggerAtMillis: Long? = null
     private var ringLabel: String? = null
     private var vibrationEnabled = true
+    private var ringSoundUri: String? = null
     private var ringtone: Ringtone? = null
     /**
      * Serializes ringtone replay against [stopRinging]: the API 26-27 loop
@@ -167,6 +177,7 @@ class AlarmForegroundService : Service() {
                 }
                 ringLabel = intent?.getStringExtra(EXTRA_LABEL)
                 vibrationEnabled = intent?.getBooleanExtra(EXTRA_VIBRATION_ENABLED, true) ?: true
+                ringSoundUri = intent?.getStringExtra(EXTRA_SOUND_URI)
                 ringAlarmId = alarmId
                 ringTriggerAtMillis = if (intent?.hasExtra(EXTRA_TRIGGER_AT_MILLIS) == true) {
                     intent.getLongExtra(EXTRA_TRIGGER_AT_MILLIS, -1L).takeIf { it >= 0 }
@@ -371,6 +382,28 @@ class AlarmForegroundService : Service() {
     }
 
     private fun startRingtone() {
+        // Custom per-alarm sound first: the frozen URI resolves through
+        // the ContentResolver (SAF grants persist across reboots). ANY
+        // failure — revoked grant, deleted file, unparseable URI, unloadable
+        // tone — falls through to the default chain below, so a broken
+        // custom sound can never silence the alarm. The URI itself is never
+        // logged (it can contain provider-internal identifiers).
+        val customUri = ringSoundUri
+        if (!customUri.isNullOrEmpty()) {
+            try {
+                val player = RingtoneManager.getRingtone(
+                    applicationContext,
+                    Uri.parse(customUri),
+                )
+                if (player != null) {
+                    startLooping(player)
+                    return
+                }
+                Log.w(TAG, "Custom alarm sound unreadable; falling back to the default tone.")
+            } catch (e: Exception) {
+                Log.w(TAG, "Custom alarm sound failed; falling back to the default tone.", e)
+            }
+        }
         try {
             val uri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -383,24 +416,33 @@ class AlarmForegroundService : Service() {
                 Log.w(TAG, "Could not load ringtone for $uri; ringing without sound.")
                 return
             }
-            player.audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            ringtone = player
-            // A single play() ends when the tone file ends (~10s on tested
-            // devices), leaving vibration-only ringing. Loop instead:
-            // native looping on API 28+, a completion watcher below.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                player.isLooping = true
-            }
-            player.play()
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-                startLoopWatcher(player)
-            }
+            startLooping(player)
         } catch (e: Exception) {
             Log.w(TAG, "Ringtone playback failed; continuing without sound.", e)
             ringtone = null
+        }
+    }
+
+    /**
+     * Starts [player] looping on the alarm audio stream: native looping on
+     * API 28+, a completion watcher below. Shared by the custom-sound and
+     * default-tone paths so both loop identically.
+     */
+    private fun startLooping(player: Ringtone) {
+        player.audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        ringtone = player
+        // A single play() ends when the tone file ends (~10s on tested
+        // devices), leaving vibration-only ringing. Loop instead:
+        // native looping on API 28+, a completion watcher below.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            player.isLooping = true
+        }
+        player.play()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            startLoopWatcher(player)
         }
     }
 

@@ -42,7 +42,7 @@ void main() {
     });
   });
 
-  test('persisted schedule sends label and vibration flag', () async {
+  test('persisted schedule sends label, vibration flag and sound', () async {
     final DateTime trigger = DateTime(2026, 10, 6, 7, 30);
 
     await scheduler.scheduleExactAlarm(
@@ -51,6 +51,7 @@ void main() {
       fireConfig: const AlarmFireConfig(
         label: 'Gym',
         vibrationEnabled: false,
+        soundUri: 'content://tones/x',
       ),
     );
 
@@ -61,6 +62,7 @@ void main() {
       'triggerAtMillis': trigger.millisecondsSinceEpoch,
       'label': 'Gym',
       'vibrationEnabled': false,
+      'soundUri': 'content://tones/x',
     });
   });
 
@@ -76,6 +78,8 @@ void main() {
     expect(args.containsKey('label'), isTrue);
     expect(args['label'], isNull);
     expect(args['vibrationEnabled'], isTrue);
+    expect(args.containsKey('soundUri'), isTrue);
+    expect(args['soundUri'], isNull);
   });
 
   test('cancel sends the alarm id', () async {
