@@ -8,7 +8,11 @@
 // capability state as text plus an icon (never color alone); rows with a
 // real system page offer one user-initiated action, and rows without one
 // (boot info, camera when merely requestable, N/A capabilities) explain
-// instead of faking a button.
+// instead of faking a button. Settings launches are bounce-guarded:
+// when the app resumes within 1500ms of a launch, the target page
+// closed (near-)instantly (OEM skins that resolve-but-kill deep
+// links), so a message offers the app-info page instead of leaving
+// the user on a silently failed redirect.
 
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/permissions/capability_state.dart';
@@ -28,7 +32,12 @@ class PermissionCenterScreen extends StatefulWidget {
     required this.cameraGate,
     required this.alarms,
     required this.missions,
+    this.clock,
   });
+
+  /// Clock for settings-bounce timing; defaults to [DateTime.now].
+  /// Tests pass a scripted clock to cross the bounce threshold on demand.
+  final DateTime Function()? clock;
 
   final PermissionSystemBridge bridge;
   final CameraPermissionGate cameraGate;
@@ -46,6 +55,19 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
   ReliabilityData? _data;
   int _reloadToken = 0;
 
+  /// Bounce threshold: a settings visit shorter than this means the target
+  /// page closed (near-)instantly instead of hosting the user (observed on
+  /// OEM skins that resolve-but-kill certain deep links, well under 1s).
+  /// Far below any genuine visit, so normal use never trips it.
+  static const Duration _bounceThreshold = Duration(milliseconds: 1500);
+
+  /// When the last settings launch returned launched=true, awaiting its
+  /// resume verdict. Consumed (nulled) on the first resume after the
+  /// launch, whatever the verdict, so each launch gets exactly one.
+  DateTime? _settingsLaunchAt;
+
+  DateTime _now() => widget.clock?.call() ?? DateTime.now();
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +84,7 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _maybeReportBounce();
       _reload();
     }
   }
@@ -108,9 +131,45 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
           content: Text(AppStrings.of(context).permissionCenterActionFailed),
         ),
       );
+    } else {
+      // Arm bounce detection: the resume observer judges whether the
+      // target page actually hosted the user (see [_maybeReportBounce]).
+      // Generic across targets — any OEM-broken deep link trips it.
+      _settingsLaunchAt = _now();
     }
     // Explicit refresh after returning; the resume observer refreshes too.
     await _reload();
+  }
+
+  /// Reports a settings "bounce": the app resumed within [_bounceThreshold]
+  /// of a launched settings action, meaning the target page closed
+  /// (near-)instantly instead of hosting the user. Offers the app-info
+  /// page (confirmed working where deep links bounce) via an explicit
+  /// action — never silently retries the broken intent. A slower return
+  /// is a genuine visit and does nothing extra. Consumes the armed stamp
+  /// exactly once, so each launch gets one verdict and plain resumes
+  /// (no launch) stay silent.
+  void _maybeReportBounce() {
+    final DateTime? launchedAt = _settingsLaunchAt;
+    _settingsLaunchAt = null;
+    if (launchedAt == null || !mounted) {
+      return;
+    }
+    if (_now().difference(launchedAt) >= _bounceThreshold) {
+      return;
+    }
+    final AppStrings strings = AppStrings.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(strings.permissionCenterBounceMessage),
+        action: SnackBarAction(
+          label: strings.permissionCenterBounceFallback,
+          onPressed: () {
+            _openSettings(PermissionSettingsTarget.appDetails);
+          },
+        ),
+      ),
+    );
   }
 
   @override

@@ -257,6 +257,8 @@ class AppStrings {
   String get permissionCenterRefresh => text('permissionCenterRefresh');
   String get permissionCenterLoadFailed => text('permissionCenterLoadFailed');
   String get permissionCenterActionFailed => text('permissionCenterActionFailed');
+  String get permissionCenterBounceMessage => text('permissionCenterBounceMessage');
+  String get permissionCenterBounceFallback => text('permissionCenterBounceFallback');
   String get permissionCenterFix => text('permissionCenterFix');
   String get reliabilityReliable => text('reliabilityReliable');
   String get reliabilityMostly => text('reliabilityMostly');
@@ -487,6 +489,8 @@ class AppStrings {
     'permissionCenterRefresh': 'تحديث',
     'permissionCenterLoadFailed': 'تعذّر قراءة حالة النظام',
     'permissionCenterActionFailed': 'تعذّر فتح صفحة الإعدادات',
+    'permissionCenterBounceMessage': 'تعذّر فتح صفحة الإعدادات المطلوبة على هذا الجهاز',
+    'permissionCenterBounceFallback': 'فتح معلومات التطبيق',
     'permissionCenterFix': 'فتح الإعدادات',
     'reliabilityReliable': 'جاهز',
     'reliabilityMostly': 'شبه جاهز',
@@ -719,6 +723,8 @@ class AppStrings {
     'permissionCenterRefresh': 'Refresh',
     'permissionCenterLoadFailed': 'Could not read system status',
     'permissionCenterActionFailed': 'Could not open the settings page',
+    'permissionCenterBounceMessage': 'The requested settings page could not be opened on this device',
+    'permissionCenterBounceFallback': 'Open app info',
     'permissionCenterFix': 'Open Settings',
     'reliabilityReliable': 'Ready',
     'reliabilityMostly': 'Mostly ready',

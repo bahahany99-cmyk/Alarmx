@@ -18,6 +18,7 @@ Future<void> pumpCenter(
   String language = AppLanguage.english,
   PermissionSystemBridge? bridge,
   CameraPermissionGate? cameraGate,
+  DateTime Function()? clock,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -29,6 +30,7 @@ Future<void> pumpCenter(
         cameraGate: cameraGate ?? FakeCameraStatusGate(),
         alarms: stack.repository,
         missions: stack.missions,
+        clock: clock,
       ),
     ),
   );
@@ -269,6 +271,91 @@ void main() {
 
     expect(bridge.reads, greaterThan(reads));
     expect(find.text(en.reliabilityAttention, skipOffstage: false), findsOneWidget);
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('instant return from settings shows the bounce fallback',
+      (WidgetTester tester) async {
+    await stack.insertAlarm(label: 'Work');
+    final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
+    await pumpCenter(tester, stack, bridge: bridge);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_notifications'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_notifications'), skipOffstage: false));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[PermissionSettingsTarget.notifications],
+    );
+
+    // Near-instant resume: the target page bounced instead of hosting us.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+
+    expect(find.text(en.permissionCenterBounceMessage), findsOneWidget);
+    expect(find.text(en.permissionCenterBounceFallback), findsOneWidget);
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('genuine settings visit shows no bounce UI',
+      (WidgetTester tester) async {
+    await stack.insertAlarm(label: 'Work');
+    final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
+    DateTime now = DateTime(2026, 1, 1);
+    await pumpCenter(tester, stack, bridge: bridge, clock: () => now);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_notifications'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_notifications'), skipOffstage: false));
+    await pumpSettle(tester);
+
+    // The user genuinely spent time in Settings: cross the threshold first.
+    now = now.add(const Duration(seconds: 5));
+    final int reads = bridge.reads;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+
+    expect(find.text(en.permissionCenterBounceMessage), findsNothing);
+    expect(find.text(en.permissionCenterBounceFallback), findsNothing);
+    // The normal resume-reload path still works.
+    expect(bridge.reads, greaterThan(reads));
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('bounce fallback action opens the app-info page',
+      (WidgetTester tester) async {
+    await stack.insertAlarm(label: 'Work');
+    final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
+    await pumpCenter(tester, stack, bridge: bridge);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_notifications'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_notifications'), skipOffstage: false));
+    await pumpSettle(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+    expect(find.text(en.permissionCenterBounceFallback), findsOneWidget);
+
+    await tester.tap(find.text(en.permissionCenterBounceFallback));
+    await pumpSettle(tester);
+
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[
+        PermissionSettingsTarget.notifications,
+        PermissionSettingsTarget.appDetails,
+      ],
+    );
     await finishWidgetTest(tester, stack);
   });
 
