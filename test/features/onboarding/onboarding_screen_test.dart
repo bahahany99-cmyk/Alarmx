@@ -297,7 +297,11 @@ void main() {
     final FakeNotificationGate gate = FakeNotificationGate();
     Future<void> pumpShell() {
       return tester.pumpWidget(
+        // Fresh key per pump: a relaunch is a new shell over the same
+        // database (same-type pumpWidget would reuse the old state and
+        // its already-resolved completion future).
         AlarmxApp(
+          key: UniqueKey(),
           repository: stack.repository,
           coordinator: stack.coordinator,
           settings: stack.settings,
