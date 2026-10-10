@@ -80,6 +80,13 @@ class AppStrings {
   String get labelLabel => text('labelLabel');
   String get labelHint => text('labelHint');
   String get timeLabel => text('timeLabel');
+  String get editorRemaining => text('editorRemaining');
+  String get editorRemainingNone => text('editorRemainingNone');
+  String get editorRemainingSoon => text('editorRemainingSoon');
+  String get msgOnceInPast => text('msgOnceInPast');
+  String get timePickerTitle => text('timePickerTitle');
+  String get periodAm => text('periodAm');
+  String get periodPm => text('periodPm');
   String get changeTime => text('changeTime');
   String get dateLabel => text('dateLabel');
   String get changeDate => text('changeDate');
@@ -346,6 +353,13 @@ class AppStrings {
     'labelLabel': 'الاسم',
     'labelHint': 'مثال: الاستيقاظ',
     'timeLabel': 'الوقت',
+    'editorRemaining': 'المتبقي',
+    'editorRemainingNone': 'لا يوجد رنين قادم',
+    'editorRemainingSoon': 'أقل من دقيقة',
+    'msgOnceInPast': 'يجب ضبط المنبه غير المتكرر على وقت في المستقبل',
+    'timePickerTitle': 'ضبط الوقت',
+    'periodAm': 'ص',
+    'periodPm': 'م',
     'changeTime': 'تغيير الوقت',
     'dateLabel': 'التاريخ',
     'changeDate': 'تغيير التاريخ',
@@ -609,6 +623,13 @@ class AppStrings {
     'labelLabel': 'Label',
     'labelHint': 'e.g. Wake up',
     'timeLabel': 'Time',
+    'editorRemaining': 'Remaining',
+    'editorRemainingNone': 'No upcoming ring',
+    'editorRemainingSoon': 'Less than a minute',
+    'msgOnceInPast': 'One-time alarms must be set to a future time',
+    'timePickerTitle': 'Set time',
+    'periodAm': 'AM',
+    'periodPm': 'PM',
     'changeTime': 'Change time',
     'dateLabel': 'Date',
     'changeDate': 'Change date',

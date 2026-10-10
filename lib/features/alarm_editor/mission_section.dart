@@ -20,6 +20,7 @@
 
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/features/alarm_editor/editor_card.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:flutter/material.dart';
 
@@ -244,7 +245,7 @@ class MissionSectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
     final ThemeData theme = Theme.of(context);
-    return Card(
+    return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -252,7 +253,7 @@ class MissionSectionCard extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Icon(Icons.emoji_events_outlined),
+                const EditorHeaderIcon(Icons.emoji_events_outlined),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

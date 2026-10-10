@@ -7,8 +7,11 @@
 //
 // Boundaries (deliberate):
 //   - Save converts the [AlarmDraft] to a companion/row and calls the
-//     controller; the screen never schedules, never computes trigger
-//     times, and never touches native APIs.
+//     controller; the screen never schedules and never touches native
+//     APIs. It shows a read-only next-ring preview computed by the
+//     draft through the shared `NextOccurrenceCalculator` (the same
+//     source the coordinator schedules from); previewing computes, it
+//     never schedules.
 //   - Snooze fields are configuration + persistence only; snooze
 //     execution belongs to the later Snooze phase (caption says so).
 //   - Fade-in and custom-sound values are stored config; the current
@@ -26,7 +29,9 @@ import 'package:alarmx/core/repositories/app_settings_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
+import 'package:alarmx/features/alarm_editor/editor_card.dart';
 import 'package:alarmx/features/alarm_editor/mission_section.dart';
+import 'package:alarmx/features/alarm_editor/time_wheel_picker.dart';
 import 'package:alarmx/features/home/alarm_formatters.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
@@ -326,15 +331,38 @@ class _EditorFormState extends State<_EditorForm> {
   }
 
   Future<void> _pickTime() async {
-    final TimeOfDay? picked = await showTimePicker(
+    final TimeOfDay? picked = await showTimeWheelPicker(
       context: context,
       initialTime: _draft.time,
+      remainingText: _remainingPreview,
     );
     if (picked != null && mounted) {
       setState(() {
         _draft.time = picked;
       });
     }
+  }
+
+  /// Read-only "time remaining" preview for a candidate [time].
+  ///
+  /// Shown under the time button (live draft) and at the bottom of the
+  /// wheel dialog (candidate wheel position). Pure delegation to
+  /// [AlarmDraft.nextOccurrence] + [formatRemainingDuration].
+  String _remainingPreview(TimeOfDay time) {
+    final AppStrings strings = AppStrings.of(context);
+    final DateTime now = DateTime.now();
+    final DateTime? target = _draft.nextOccurrence(now: now, atTime: time);
+    if (target == null) {
+      return strings.editorRemainingNone;
+    }
+    final Duration diff = target.difference(now);
+    if (diff.inMinutes < 1) {
+      return strings.editorRemainingSoon;
+    }
+    return formatRemainingDuration(
+      diff,
+      Localizations.localeOf(context).languageCode,
+    );
   }
 
   Future<void> _pickDate() async {
@@ -443,6 +471,9 @@ class _EditorFormState extends State<_EditorForm> {
         return;
       }
       final Alarm? existing = widget.existing;
+      if (existing != null && !_draft.enabled) {
+        _maybeReEnable(existing);
+      }
       final AlarmUiResult result = existing == null
           ? await widget.controller.createAlarm(_draft.toCompanion())
           : await widget.controller.updateAlarm(_draft.applyTo(existing));
@@ -523,6 +554,27 @@ class _EditorFormState extends State<_EditorForm> {
     }
   }
 
+  /// Auto re-enables a disabled alarm being edited when its time was
+  /// moved to a valid future occurrence: setting the time is an
+  /// explicit "wake me" gesture, so the alarm should ring. Label-only
+  /// (or any other non-time) edits never flip the switch.
+  void _maybeReEnable(Alarm existing) {
+    final bool timeChanged = _draft.hour != existing.hour ||
+        _draft.minute != existing.minute ||
+        (_draft.repeatType == RepeatType.once &&
+            !_isSameDay(_draft.onceDate, existing.onceDate));
+    if (timeChanged && _draft.nextOccurrence() != null) {
+      _draft.enabled = true;
+    }
+  }
+
+  static bool _isSameDay(DateTime a, DateTime? b) {
+    return b != null &&
+        a.year == b.year &&
+        a.month == b.month &&
+        a.day == b.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
@@ -537,6 +589,25 @@ class _EditorFormState extends State<_EditorForm> {
               bottom: 12,
             ),
             children: <Widget>[
+              TextField(
+                key: const Key('editor_label_field'),
+                controller: _labelController,
+                decoration: InputDecoration(
+                  labelText: strings.labelLabel,
+                  hintText: strings.labelHint,
+                  prefixIcon: const Icon(Icons.label_outline),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                textInputAction: TextInputAction.done,
+                maxLength: 120,
+                onChanged: (String value) {
+                  _draft.label = value;
+                },
+              ),
+              const SizedBox(height: 12),
               _EnabledCard(
                 enabled: _draft.enabled,
                 onChanged: (bool value) {
@@ -546,21 +617,10 @@ class _EditorFormState extends State<_EditorForm> {
                 },
               ),
               const SizedBox(height: 12),
-              _TimeCard(onPickTime: _pickTime, draft: _draft),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('editor_label_field'),
-                controller: _labelController,
-                decoration: InputDecoration(
-                  labelText: strings.labelLabel,
-                  hintText: strings.labelHint,
-                  border: const OutlineInputBorder(),
-                ),
-                textInputAction: TextInputAction.done,
-                maxLength: 120,
-                onChanged: (String value) {
-                  _draft.label = value;
-                },
+              _TimeCard(
+                onPickTime: _pickTime,
+                draft: _draft,
+                remainingPreview: _remainingPreview(_draft.time),
               ),
               const SizedBox(height: 12),
               _RepeatCard(
@@ -644,7 +704,7 @@ class _EnabledCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
-    return Card(
+    return EditorCard(
       child: SwitchListTile(
         secondary: Icon(enabled ? Icons.alarm_on : Icons.alarm_off),
         title: Text(enabled ? strings.onLabel : strings.offLabel),
@@ -657,33 +717,67 @@ class _EnabledCard extends StatelessWidget {
 
 /// Time picker row.
 class _TimeCard extends StatelessWidget {
-  const _TimeCard({required this.draft, required this.onPickTime});
+  const _TimeCard({
+    required this.draft,
+    required this.onPickTime,
+    required this.remainingPreview,
+  });
 
   final AlarmDraft draft;
   final VoidCallback onPickTime;
 
+  /// Precomputed "time remaining" line for the live draft.
+  final String remainingPreview;
+
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
-    return Card(
+    final ThemeData theme = Theme.of(context);
+    return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Icon(Icons.schedule),
-            const SizedBox(width: 12),
-            Text(
-              strings.timeLabel,
-              style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              children: <Widget>[
+                const EditorHeaderIcon(Icons.schedule),
+                const SizedBox(width: 12),
+                Text(
+                  strings.timeLabel,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const Spacer(),
+                FilledButton.tonal(
+                  key: const Key('editor_time_button'),
+                  onPressed: onPickTime,
+                  child: Text(
+                    draft.time.format(context),
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                ),
+              ],
             ),
-            const Spacer(),
-            FilledButton.tonal(
-              key: const Key('editor_time_button'),
-              onPressed: onPickTime,
-              child: Text(
-                draft.time.format(context),
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+            const SizedBox(height: 12),
+            Row(
+              key: const Key('editor_remaining'),
+              children: <Widget>[
+                Icon(
+                  Icons.timelapse,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${strings.editorRemaining}: $remainingPreview',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -707,13 +801,13 @@ class _RepeatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
-    return Card(
+    return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            _SectionHeader(strings.repeatLabel),
+            _SectionHeader(strings.repeatLabel, icon: Icons.repeat),
             const SizedBox(height: 12),
             SegmentedButton<RepeatType>(
               segments: <ButtonSegment<RepeatType>>[
@@ -799,13 +893,13 @@ class _SoundCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
     final ThemeData theme = Theme.of(context);
-    return Card(
+    return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            _SectionHeader(strings.soundLabel),
+            _SectionHeader(strings.soundLabel, icon: Icons.music_note),
             const SizedBox(height: 12),
             SegmentedButton<bool>(
               segments: <ButtonSegment<bool>>[
@@ -890,7 +984,7 @@ class _TogglesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
-    return Card(
+    return EditorCard(
       child: Column(
         children: <Widget>[
           SwitchListTile(
@@ -934,7 +1028,7 @@ class _StrictCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppStrings strings = AppStrings.of(context);
-    return Card(
+    return EditorCard(
       child: SwitchListTile(
         key: const Key('editor_strict_switch'),
         title: Text(strings.strictModeLabel),
@@ -970,7 +1064,7 @@ class _SnoozeCard extends StatelessWidget {
       draft.snoozeMaxCount,
     }.toList()
       ..sort();
-    return Card(
+    return EditorCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -978,7 +1072,7 @@ class _SnoozeCard extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Icon(Icons.snooze),
+                const EditorHeaderIcon(Icons.snooze),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -1057,18 +1151,30 @@ class _SnoozeCard extends StatelessWidget {
 
 /// Section header with heading semantics for screen readers.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.label);
+  const _SectionHeader(this.label, {this.icon});
 
   final String label;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      header: true,
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
+    final IconData? chip = icon;
+    return Row(
+      children: <Widget>[
+        if (chip != null) ...<Widget>[
+          EditorHeaderIcon(chip),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Semantics(
+            header: true,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

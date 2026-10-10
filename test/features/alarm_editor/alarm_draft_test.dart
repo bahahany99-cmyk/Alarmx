@@ -189,12 +189,33 @@ void main() {
   });
 
   group('AlarmDraft validation', () {
-    test('daily and once are always structurally valid', () {
+    test('daily is always structurally valid', () {
       final AlarmDraft daily = AlarmDraft(now: monday);
-      expect(daily.validationMessageKey(), isNull);
+      expect(daily.validationMessageKey(now: monday), isNull);
+    });
+
+    test('once with a future occurrence is valid', () {
+      final AlarmDraft once = AlarmDraft(now: monday)
+        ..repeatType = RepeatType.once
+        ..hour = 18
+        ..minute = 0;
+      // Monday 18:00 is after the pinned Monday 15:30.
+      expect(once.validationMessageKey(now: monday), isNull);
+    });
+
+    test('once with a past occurrence is rejected', () {
       final AlarmDraft once = AlarmDraft(now: monday)
         ..repeatType = RepeatType.once;
-      expect(once.validationMessageKey(), isNull);
+      // Default 07:00 on the pinned Monday is already past at 15:30.
+      expect(once.validationMessageKey(now: monday), 'msgOnceInPast');
+    });
+
+    test('once exactly at now is rejected', () {
+      final AlarmDraft once = AlarmDraft(now: monday)
+        ..repeatType = RepeatType.once
+        ..hour = 15
+        ..minute = 30;
+      expect(once.validationMessageKey(now: monday), 'msgOnceInPast');
     });
 
     test('custom with no day is rejected', () {
@@ -208,6 +229,82 @@ void main() {
         ..repeatType = RepeatType.custom
         ..repeatDays = RepeatDays.fromDays({Weekday.monday});
       expect(draft.validationMessageKey(), isNull);
+    });
+  });
+
+  group('AlarmDraft.nextOccurrence', () {
+    test('daily delegates to the shared calculator', () {
+      final AlarmDraft draft = AlarmDraft(now: monday);
+      expect(
+        draft.nextOccurrence(now: monday),
+        DateTime(2026, 10, 6, 7, 0),
+      );
+    });
+
+    test('once resolves to its configured day', () {
+      final AlarmDraft draft = AlarmDraft(now: monday)
+        ..repeatType = RepeatType.once
+        ..hour = 18
+        ..minute = 45;
+      expect(
+        draft.nextOccurrence(now: monday),
+        DateTime(2026, 10, 5, 18, 45),
+      );
+    });
+
+    test('past once has no occurrence', () {
+      final AlarmDraft draft = AlarmDraft(now: monday)
+        ..repeatType = RepeatType.once;
+      expect(draft.nextOccurrence(now: monday), isNull);
+    });
+
+    test('atTime previews a candidate wheel position', () {
+      final AlarmDraft draft = AlarmDraft(now: monday);
+      expect(
+        draft.nextOccurrence(
+          now: monday,
+          atTime: const TimeOfDay(hour: 20, minute: 15),
+        ),
+        DateTime(2026, 10, 5, 20, 15),
+      );
+      // The draft itself is untouched by the preview.
+      expect(draft.hour, 7);
+      expect(draft.minute, 0);
+    });
+  });
+
+  group('formatRemainingDuration', () {
+    test('english compacts to the largest two units', () {
+      expect(
+        formatRemainingDuration(const Duration(hours: 7, minutes: 25), 'en'),
+        '7h 25m',
+      );
+      expect(
+        formatRemainingDuration(const Duration(days: 3, hours: 4), 'en'),
+        '3d 4h',
+      );
+      expect(
+        formatRemainingDuration(const Duration(minutes: 35), 'en'),
+        '35m',
+      );
+    });
+
+    test('arabic uses arabic unit glyphs', () {
+      expect(
+        formatRemainingDuration(const Duration(hours: 7, minutes: 25), 'ar'),
+        '7\u0633 25\u062f',
+      );
+      expect(
+        formatRemainingDuration(const Duration(days: 2, hours: 5), 'ar'),
+        '2 \u064a\u0648\u0645 5\u0633',
+      );
+    });
+
+    test('negative durations clamp to zero', () {
+      expect(
+        formatRemainingDuration(const Duration(minutes: -5), 'en'),
+        '0m',
+      );
     });
   });
 

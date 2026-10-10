@@ -1,5 +1,6 @@
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/l10n/app_strings.dart';
+import 'package:alarmx/core/models/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,6 +9,9 @@ import '../../support/test_doubles.dart';
 // Editor tests: real in-memory stack, English locale. Save outcomes are
 // asserted through repository + fake scheduler state; result-message
 // mapping is covered by the controller tests.
+
+/// Vertical drag distance that advances a time wheel exactly one detent.
+const double kTimeWheelDrag = 48;
 
 void main() {
   late TestStack stack;
@@ -317,17 +321,60 @@ void main() {
   });
 
   group('pickers', () {
-    testWidgets('time picker opens and keeps the value on OK',
+    testWidgets('wheel time picker opens and keeps the value on set',
         (WidgetTester tester) async {
       await pumpEditor(tester, stack);
       await tester.tap(find.byKey(const Key('editor_time_button')));
       await pumpSettle(tester);
-      expect(find.byType(TimePickerDialog), findsOneWidget);
+      expect(find.byKey(const Key('time_wheel_hour')), findsOneWidget);
+      expect(find.byKey(const Key('time_wheel_minute')), findsOneWidget);
+      expect(find.byKey(const Key('time_wheel_period')), findsOneWidget);
+      expect(find.byKey(const Key('time_wheel_remaining')), findsOneWidget);
 
-      await tester.tap(find.text('OK'));
+      await tester.tap(find.byKey(const Key('time_wheel_set')));
       await pumpSettle(tester);
-      expect(find.byType(TimePickerDialog), findsNothing);
+      expect(find.byKey(const Key('time_wheel_set')), findsNothing);
       expect(find.textContaining('7:00'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('wheel time picker changes the time',
+        (WidgetTester tester) async {
+      await pumpEditor(tester, stack);
+      await tester.tap(find.byKey(const Key('editor_time_button')));
+      await pumpSettle(tester);
+
+      // One detent up on the hour wheel: 7 -> 8.
+      await tester.drag(
+        find.byKey(const Key('time_wheel_hour')),
+        const Offset(0, -kTimeWheelDrag),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('time_wheel_set')));
+      await pumpSettle(tester);
+
+      expect(find.textContaining('8:00'), findsOneWidget);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('name field sits above the time button',
+        (WidgetTester tester) async {
+      await pumpEditor(tester, stack);
+      final double labelDy = tester
+          .getTopLeft(find.byKey(const Key('editor_label_field')))
+          .dy;
+      final double timeDy = tester
+          .getTopLeft(find.byKey(const Key('editor_time_button')))
+          .dy;
+      expect(labelDy, lessThan(timeDy));
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('time card shows the remaining preview',
+        (WidgetTester tester) async {
+      await pumpEditor(tester, stack);
+      expect(find.byKey(const Key('editor_remaining')), findsOneWidget);
+      expect(find.textContaining(en.editorRemaining), findsWidgets);
       await finishWidgetTest(tester, stack);
     });
 
@@ -405,6 +452,91 @@ void main() {
       expect(stored?.enabled, isFalse);
       expect(stored?.nextTriggerAt, isNull);
       expect(stack.scheduler.cancelledIds, contains(id));
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('past one-time alarm blocks saving',
+        (WidgetTester tester) async {
+      final DateTime yesterday =
+          DateTime.now().subtract(const Duration(days: 1));
+      final int id = await stack.insertAlarm(
+        hour: 7,
+        repeatType: RepeatType.once,
+        onceDate: DateTime(yesterday.year, yesterday.month, yesterday.day),
+      );
+      await pumpEditor(tester, stack, alarmId: id);
+
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      expect(find.text(en.msgOnceInPast), findsOneWidget);
+      expect(find.byKey(const Key('editor_save_button')), findsOneWidget);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('future one-time alarm saves normally',
+        (WidgetTester tester) async {
+      final DateTime tomorrow =
+          DateTime.now().add(const Duration(days: 1));
+      final int id = await stack.insertAlarm(
+        hour: 7,
+        repeatType: RepeatType.once,
+        onceDate: DateTime(tomorrow.year, tomorrow.month, tomorrow.day),
+      );
+      await pumpEditor(tester, stack, alarmId: id);
+
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      expect(find.byKey(const Key('editor_save_button')), findsNothing);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('retiming a disabled alarm re-enables it',
+        (WidgetTester tester) async {
+      final int id =
+          await stack.insertAlarm(hour: 7, enabled: false);
+      await pumpEditor(tester, stack, alarmId: id);
+
+      await tester.tap(find.byKey(const Key('editor_time_button')));
+      await pumpSettle(tester);
+      await tester.drag(
+        find.byKey(const Key('time_wheel_hour')),
+        const Offset(0, -kTimeWheelDrag),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('time_wheel_set')));
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      final Alarm? stored = await stack.repository.getAlarmById(id);
+      expect(stored?.enabled, isTrue);
+      expect(stored?.hour, 8);
+      expect(stored?.nextTriggerAt, isNotNull);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('label-only edit keeps a disabled alarm disabled',
+        (WidgetTester tester) async {
+      final int id = await stack.insertAlarm(
+        hour: 7,
+        enabled: false,
+        label: 'Old',
+      );
+      await pumpEditor(tester, stack, alarmId: id);
+
+      await tester.enterText(
+        find.byKey(const Key('editor_label_field')),
+        'New',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('editor_save_button')));
+      await pumpSettle(tester);
+
+      final Alarm? stored = await stack.repository.getAlarmById(id);
+      expect(stored?.label, 'New');
+      expect(stored?.enabled, isFalse);
       await finishWidgetTest(tester, stack);
     });
 

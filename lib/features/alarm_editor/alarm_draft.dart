@@ -13,9 +13,13 @@
 //   - `onceDate` is meaningful only when `repeatType` is once.
 //   - `strictMode` has no editor control in this phase (see below) and is
 //     only carried through so create/edit preserve it.
-//   - A past one-time date/time is NOT a validation error here: the
-//     coordinator reports it via `AlarmNotSchedulable` and the UI shows
-//     that outcome. "Past" depends on schedule time, not form structure.
+//   - A past one-time date/time IS a validation error here
+//     (`msgOnceInPast`): the draft asks the shared
+//     [NextOccurrenceCalculator] — the single source of truth for
+//     recurrence math — instead of duplicating any of it. Recurring
+//     drafts always have an upcoming occurrence, so only `once` can fail.
+//   - [nextOccurrence] also feeds the editor's read-only "time
+//     remaining" preview; the preview computes, it never schedules.
 //   - `soundType` 'default' vs 'custom': 'custom' is written only together
 //     with a non-empty `soundUri`. The native service does not consume
 //     either yet (default ringtone pipeline); both are stored config for
@@ -23,6 +27,8 @@
 
 import 'package:alarmx/core/database/database.dart';
 import 'package:alarmx/core/models/models.dart';
+import 'package:alarmx/core/scheduling/alarm_schedule.dart';
+import 'package:alarmx/core/scheduling/next_occurrence_calculator.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart' show TimeOfDay;
 
@@ -119,13 +125,42 @@ class AlarmDraft {
 
   /// Structural validation key, or null when the draft can be saved.
   ///
-  /// Only form-structure problems are reported here (see file docs).
-  /// Returns an [AppStrings] message key, not display text.
-  String? validationMessageKey() {
+  /// Only form-structure problems are reported here (see file docs),
+  /// plus the past one-time guard: a `once` draft with no upcoming
+  /// occurrence (past, exactly-now, or dateless) cannot be saved.
+  /// Returns an [AppStrings] message key, not display text. [now] pins
+  /// the clock for tests; production passes nothing.
+  String? validationMessageKey({DateTime? now}) {
     if (repeatType == RepeatType.custom && repeatDays.isEmpty) {
       return 'msgValidationDays';
     }
+    if (repeatType == RepeatType.once &&
+        nextOccurrence(now: now ?? DateTime.now()) == null) {
+      return 'msgOnceInPast';
+    }
     return null;
+  }
+
+  /// Next local firing time for this draft, or null when the schedule
+  /// has no upcoming occurrence (only possible for `once`).
+  ///
+  /// Pure recurrence math via the shared [NextOccurrenceCalculator] —
+  /// the same source the coordinator schedules from, so the editor
+  /// preview and the real schedule can never disagree. [atTime]
+  /// previews a candidate time (the wheel picker); [now] pins the
+  /// clock for tests.
+  DateTime? nextOccurrence({DateTime? now, TimeOfDay? atTime}) {
+    final AlarmSchedule schedule = AlarmSchedule(
+      repeatType: repeatType,
+      hour: atTime?.hour ?? hour,
+      minute: atTime?.minute ?? minute,
+      onceDate: repeatType == RepeatType.once ? onceDate : null,
+      repeatDays: repeatDays,
+    );
+    return const NextOccurrenceCalculator().nextOccurrence(
+      schedule: schedule,
+      now: now ?? DateTime.now(),
+    );
   }
 
   /// Converts to an insert companion. `nextTriggerAt` is intentionally
@@ -188,4 +223,34 @@ class AlarmDraft {
   static DateTime _dateOnly(DateTime value) {
     return DateTime(value.year, value.month, value.day);
   }
+}
+
+/// Formats [diff] compactly ("7h 25m"), largest two units.
+///
+/// Pure: callers map a null target to `editorRemainingNone` and a
+/// sub-minute [diff] to `editorRemainingSoon`. Unit glyphs follow
+/// [languageCode] (`ar` uses Arabic letters, anything else English).
+/// A negative [diff] is treated as zero (defensive: callers pass
+/// future targets).
+String formatRemainingDuration(Duration diff, String languageCode) {
+  final Duration sane = diff.isNegative ? Duration.zero : diff;
+  final int days = sane.inDays;
+  final int hours = sane.inHours % 24;
+  final int minutes = sane.inMinutes % 60;
+  if (languageCode == 'ar') {
+    if (days > 0) {
+      return '$days \u064a\u0648\u0645 ${hours}\u0633';
+    }
+    if (hours > 0) {
+      return '${hours}\u0633 ${minutes}\u062f';
+    }
+    return '${minutes}\u062f';
+  }
+  if (days > 0) {
+    return '${days}d ${hours}h';
+  }
+  if (hours > 0) {
+    return '${hours}h ${minutes}m';
+  }
+  return '${minutes}m';
 }
