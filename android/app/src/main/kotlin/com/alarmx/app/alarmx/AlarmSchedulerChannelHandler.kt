@@ -295,6 +295,9 @@ class AlarmSchedulerChannelHandler(
             } else {
                 null
             }
+        val overlayGranted: Boolean? = runCatching {
+            Settings.canDrawOverlays(context)
+        }.getOrNull()
         val batteryExempt: Boolean? = runCatching {
             powerManager.isIgnoringBatteryOptimizations(context.packageName)
         }.getOrNull()
@@ -317,6 +320,7 @@ class AlarmSchedulerChannelHandler(
             "ringingChannelEnabled" to ringingChannelEnabled,
             "canScheduleExactAlarms" to canScheduleExact,
             "fullScreenIntentAllowed" to fullScreenIntentAllowed,
+            "overlayGranted" to overlayGranted,
             "batteryExempt" to batteryExempt,
             "bootReceiverEnabled" to bootReceiverEnabled,
         )
@@ -372,6 +376,14 @@ class AlarmSchedulerChannelHandler(
                     Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT),
                 )
             }
+            // Display-over-other-apps management for this app (secondary
+            // lock-screen popup mechanism on strict OEM skins).
+            "overlay" -> listOf(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    packageUri,
+                ),
+            )
             // The settings list needs no permission; the direct exemption
             // request action would need REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
             // in the manifest (Play-policy sensitive), so we do not use it.

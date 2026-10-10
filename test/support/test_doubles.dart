@@ -279,6 +279,7 @@ Map<String, Object?> fakeGrantedSnapshot({int sdkInt = 34}) {
     'ringingChannelEnabled': true,
     'canScheduleExactAlarms': true,
     'fullScreenIntentAllowed': sdkInt >= 34 ? true : null,
+    'overlayGranted': true,
     'batteryExempt': true,
     'bootReceiverEnabled': true,
   };

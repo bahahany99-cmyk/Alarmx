@@ -13,6 +13,7 @@ void main() {
     bool? channel = true,
     bool? exact = true,
     bool? fullScreen = true,
+    bool? overlay = true,
     bool? exempt = true,
     bool? boot = true,
   }) {
@@ -23,6 +24,7 @@ void main() {
       'ringingChannelEnabled': channel,
       'canScheduleExactAlarms': exact,
       'fullScreenIntentAllowed': fullScreen,
+      'overlayGranted': overlay,
       'batteryExempt': exempt,
       'bootReceiverEnabled': boot,
     };
@@ -40,6 +42,7 @@ void main() {
     expect(snapshot.notifications, CapabilityState.granted);
     expect(snapshot.exactAlarm, CapabilityState.granted);
     expect(snapshot.fullScreenIntent, CapabilityState.granted);
+    expect(snapshot.overlay, CapabilityState.granted);
     expect(snapshot.boot, CapabilityState.granted);
     expect(snapshot.battery, CapabilityState.granted);
     expect(snapshot.camera, CapabilityState.granted);
@@ -90,6 +93,16 @@ void main() {
     );
   });
 
+  test('overlay denial maps to denied and is never not-applicable', () {
+    expect(map(native(overlay: false)).overlay, CapabilityState.denied);
+    // Overlay exists on every supported API: old releases still probe it.
+    expect(
+      map(native(sdkInt: 30, overlay: false)).overlay,
+      CapabilityState.denied,
+    );
+    expect(map(native(sdkInt: 30)).overlay, CapabilityState.granted);
+  });
+
   test('disabled boot receiver is unavailable, not denied', () {
     expect(map(native(boot: false)).boot, CapabilityState.unavailable);
   });
@@ -112,6 +125,7 @@ void main() {
     expect(snapshot.notifications, CapabilityState.unknown);
     expect(snapshot.exactAlarm, CapabilityState.unknown);
     expect(snapshot.fullScreenIntent, CapabilityState.unknown);
+    expect(snapshot.overlay, CapabilityState.unknown);
     expect(snapshot.boot, CapabilityState.unknown);
     expect(snapshot.battery, CapabilityState.unknown);
     expect(snapshot.camera, CapabilityState.restricted);
@@ -125,6 +139,7 @@ void main() {
       'ringingChannelEnabled': 1,
       'canScheduleExactAlarms': 'true',
       'fullScreenIntentAllowed': 0,
+      'overlayGranted': 0,
       'batteryExempt': 'exempt',
       'bootReceiverEnabled': <bool>[true],
     });
@@ -132,6 +147,7 @@ void main() {
     expect(snapshot.notifications, CapabilityState.unknown);
     expect(snapshot.exactAlarm, CapabilityState.unknown);
     expect(snapshot.fullScreenIntent, CapabilityState.unknown);
+    expect(snapshot.overlay, CapabilityState.unknown);
     expect(snapshot.boot, CapabilityState.unknown);
     expect(snapshot.battery, CapabilityState.unknown);
   });
@@ -155,6 +171,7 @@ void main() {
     expect(snapshot.notifications, CapabilityState.unknown);
     expect(snapshot.exactAlarm, CapabilityState.unknown);
     expect(snapshot.fullScreenIntent, CapabilityState.unknown);
+    expect(snapshot.overlay, CapabilityState.unknown);
     expect(snapshot.boot, CapabilityState.unknown);
     expect(snapshot.battery, CapabilityState.unknown);
     expect(snapshot.camera, CapabilityState.denied);

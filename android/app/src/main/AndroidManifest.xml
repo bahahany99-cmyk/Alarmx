@@ -32,6 +32,15 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!--
+      Secondary lock-screen popup mechanism (strict OEM skins): when the
+      system will not honor the full-screen intent but the user granted
+      "display over other apps", the ringing service attempts the same
+      ring intent directly. Requested only through the system settings
+      page via explicit user action; never assumed granted.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!--
       Phase 1.2 foreground ringing service. FOREGROUND_SERVICE is required to
       call startForeground(); FOREGROUND_SERVICE_MEDIA_PLAYBACK matches the
       service's android:foregroundServiceType="mediaPlayback" declaration

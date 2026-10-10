@@ -19,6 +19,7 @@ Map<String, Object?> fakeDeniedSnapshot() {
   snapshot['postNotificationsGranted'] = false;
   snapshot['canScheduleExactAlarms'] = false;
   snapshot['fullScreenIntentAllowed'] = false;
+  snapshot['overlayGranted'] = false;
   snapshot['batteryExempt'] = false;
   return snapshot;
 }
@@ -288,6 +289,7 @@ void main() {
       (WidgetTester tester) async {
     final Map<String, Object?> snapshot = fakeGrantedSnapshot();
     snapshot['fullScreenIntentAllowed'] = false;
+    snapshot['overlayGranted'] = false;
     final FakeOnboardingRepository onboarding = FakeOnboardingRepository();
     bool finished = false;
     await pumpOnboarding(
@@ -324,6 +326,7 @@ void main() {
       (WidgetTester tester) async {
     final Map<String, Object?> snapshot = fakeGrantedSnapshot();
     snapshot['fullScreenIntentAllowed'] = false;
+    snapshot['overlayGranted'] = false;
     final FakePermissionSystemBridge bridge =
         FakePermissionSystemBridge(snapshot: snapshot);
     final DateTime now = DateTime(2026, 1, 1);
@@ -354,6 +357,79 @@ void main() {
         PermissionSettingsTarget.specialAppAccess,
       ],
     );
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('full-screen step offers display-over-apps as an alternative',
+      (WidgetTester tester) async {
+    final Map<String, Object?> snapshot = fakeGrantedSnapshot();
+    snapshot['fullScreenIntentAllowed'] = false;
+    snapshot['overlayGranted'] = false;
+    final FakePermissionSystemBridge bridge =
+        FakePermissionSystemBridge(snapshot: snapshot);
+    final DateTime now = DateTime(2026, 1, 1);
+    await pumpOnboarding(tester, bridge: bridge, clock: () => now);
+
+    await tapContinue(tester);
+    await tapContinue(tester);
+    expect(find.text(en.onboardingFullScreenTitle), findsOneWidget);
+    expect(
+      find.byKey(const Key('onboarding_overlay_instead')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('onboarding_overlay_instead')));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[PermissionSettingsTarget.overlay],
+    );
+
+    // A bounced overlay page falls back to app info (not special access:
+    // that retry belongs to the full-screen deep link only).
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+    expect(find.text(en.onboardingBounceNote), findsOneWidget);
+    expect(find.text(en.onboardingAppInfoAction), findsOneWidget);
+    expect(find.text(en.onboardingSpecialAccessAction), findsNothing);
+
+    await tester.tap(find.text(en.onboardingAppInfoAction));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[
+        PermissionSettingsTarget.overlay,
+        PermissionSettingsTarget.appDetails,
+      ],
+    );
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('overlay grant satisfies the full-screen step',
+      (WidgetTester tester) async {
+    final Map<String, Object?> snapshot = fakeGrantedSnapshot();
+    snapshot['fullScreenIntentAllowed'] = false;
+    await pumpOnboarding(
+      tester,
+      bridge: FakePermissionSystemBridge(snapshot: snapshot),
+    );
+
+    await tapContinue(tester);
+    await tapContinue(tester);
+    expect(find.text(en.onboardingFullScreenTitle), findsOneWidget);
+    // Satisfied via the fallback: Continue plus the note naming the
+    // active mechanism; no primary, alternative, or skip.
+    expect(find.text(en.onboardingOverlayFallbackNote), findsOneWidget);
+    expect(find.byKey(const Key('onboarding_continue')), findsOneWidget);
+    expect(find.byKey(const Key('onboarding_primary')), findsNothing);
+    expect(
+      find.byKey(const Key('onboarding_overlay_instead')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('onboarding_skip_fullscreen')), findsNothing);
+
+    await tapContinue(tester);
+    expect(find.text(en.onboardingBootTitle), findsOneWidget);
     await finishWidgetTest(tester, stack);
   });
 

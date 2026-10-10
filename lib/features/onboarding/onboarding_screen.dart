@@ -71,6 +71,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   int _refreshToken = 0;
 
+  /// Target of the latest launched settings action. Read only when the
+  /// detector reports a bounce (which requires a launch), so it always
+  /// names the page that just bounced.
+  PermissionSettingsTarget? _lastTarget;
+
   late final SettingsBounceDetector _bounceDetector =
       SettingsBounceDetector(clock: widget.clock);
 
@@ -245,6 +250,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _openTarget(PermissionSettingsTarget target) async {
     final bool launched = await widget.bridge.openSettings(target);
     if (launched && mounted) {
+      _lastTarget = target;
       _bounceDetector.arm();
     }
   }
@@ -298,12 +304,27 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       case OnboardingStep.exactAlarm:
         return s.exactAlarm == CapabilityState.granted;
       case OnboardingStep.fullScreen:
-        return s.fullScreenIntent == CapabilityState.granted;
+        // Either popup mechanism satisfies the step: full-screen
+        // intent is primary, the overlay grant is the OEM fallback.
+        return s.fullScreenIntent == CapabilityState.granted ||
+            s.overlay == CapabilityState.granted;
       case OnboardingStep.boot:
         return s.boot == CapabilityState.granted;
       case OnboardingStep.battery:
         return s.battery == CapabilityState.granted;
     }
+  }
+
+  /// True when the full-screen step is satisfied by the overlay grant
+  /// rather than full-screen intent itself (the UI says which mechanism
+  /// is active so a satisfied step never misleads).
+  static bool _satisfiedViaOverlay(
+      OnboardingStep step, PermissionSnapshot? snapshot) {
+    if (step != OnboardingStep.fullScreen || snapshot == null) {
+      return false;
+    }
+    return snapshot.fullScreenIntent != CapabilityState.granted &&
+        snapshot.overlay == CapabilityState.granted;
   }
 
   static bool _isNotApplicable(OnboardingStep step, PermissionSnapshot? s) {
@@ -373,12 +394,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          if (granted)
+          if (granted) ...<Widget>[
+            if (_satisfiedViaOverlay(step, snapshot))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  strings.onboardingOverlayFallbackNote,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             FilledButton(
               key: const Key('onboarding_continue'),
               onPressed: _busy ? null : _advance,
               child: Text(strings.onboardingContinue),
-            )
+            ),
+          ]
           else if (step != OnboardingStep.boot) ...<Widget>[
             FilledButton(
               key: const Key('onboarding_primary'),
@@ -391,6 +422,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 key: const Key('onboarding_skip'),
                 onPressed: _busy ? null : _complete,
                 child: Text(strings.onboardingSkip),
+              ),
+            ],
+            // Secondary fallback action: on strict OEM skins the
+            // full-screen page bounces or lacks the toggle, so the step
+            // also offers the overlay grant that powers the same popup.
+            if (step == OnboardingStep.fullScreen) ...<Widget>[
+              const SizedBox(height: 4),
+              TextButton(
+                key: const Key('onboarding_overlay_instead'),
+                onPressed: _busy
+                    ? null
+                    : () => _openTarget(PermissionSettingsTarget.overlay),
+                child: Text(strings.onboardingOverlayInstead),
               ),
             ],
             // Full-screen intent lives under Special App Access, a page
@@ -421,14 +465,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Text(_bounceNote(strings, step)),
+                    Text(_bounceNote(strings)),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       key: const Key('onboarding_fallback'),
                       onPressed: _busy
                           ? null
-                          : () => _openTarget(_fallbackTarget(step)),
-                      child: Text(_fallbackLabel(strings, step)),
+                          : () => _openTarget(_fallbackTarget()),
+                      child: Text(_fallbackLabel(strings)),
                     ),
                   ],
                 ),
@@ -515,25 +559,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
-  /// Bounce fallback per step. Full-screen intent is managed under
-  /// Special App Access, so a bounced visit retries there instead of the
-  /// app-info page (which lacks the toggle on some OEM skins).
-  static PermissionSettingsTarget _fallbackTarget(OnboardingStep step) {
-    if (step == OnboardingStep.fullScreen) {
+  /// Bounce fallback for the last launch. A bounced full-screen deep
+  /// link retries under Special App Access (which manages the toggle);
+  /// every other bounced target, including the overlay page, falls back
+  /// to app info.
+  PermissionSettingsTarget _fallbackTarget() {
+    if (_lastTarget == PermissionSettingsTarget.fullScreen) {
       return PermissionSettingsTarget.specialAppAccess;
     }
     return PermissionSettingsTarget.appDetails;
   }
 
-  static String _fallbackLabel(AppStrings strings, OnboardingStep step) {
-    if (step == OnboardingStep.fullScreen) {
+  String _fallbackLabel(AppStrings strings) {
+    if (_lastTarget == PermissionSettingsTarget.fullScreen) {
       return strings.onboardingSpecialAccessAction;
     }
     return strings.onboardingAppInfoAction;
   }
 
-  static String _bounceNote(AppStrings strings, OnboardingStep step) {
-    if (step == OnboardingStep.fullScreen) {
+  String _bounceNote(AppStrings strings) {
+    if (_lastTarget == PermissionSettingsTarget.fullScreen) {
       return strings.onboardingFullScreenBounceNote;
     }
     return strings.onboardingBounceNote;

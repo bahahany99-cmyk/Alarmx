@@ -10,6 +10,7 @@
 //   ringingChannelEnabled: Boolean,
 //   canScheduleExactAlarms: Boolean (true below API 31),
 //   fullScreenIntentAllowed: Boolean? (null below API 34),
+//   overlayGranted: Boolean (no version gate: minSdk 26 >= 23),
 //   batteryExempt: Boolean, bootReceiverEnabled: Boolean.
 // Any missing or mistyped entry degrades its capability to
 // [CapabilityState.unknown]; a missing sdkInt degrades every
@@ -23,6 +24,7 @@ class PermissionSnapshot {
     required this.notifications,
     required this.exactAlarm,
     required this.fullScreenIntent,
+    required this.overlay,
     required this.boot,
     required this.battery,
     required this.camera,
@@ -40,6 +42,10 @@ class PermissionSnapshot {
   /// Full-screen-intent allowance; [CapabilityState.notApplicable] below
   /// API 34.
   final CapabilityState fullScreenIntent;
+
+  /// Display-over-other-apps grant; the secondary lock-screen popup
+  /// mechanism. Never not-applicable (supported on every minSdk).
+  final CapabilityState overlay;
 
   /// Boot-receiver manifest capability (enabled component).
   final CapabilityState boot;
@@ -60,6 +66,7 @@ class PermissionSnapshot {
       notifications: CapabilityState.unknown,
       exactAlarm: CapabilityState.unknown,
       fullScreenIntent: CapabilityState.unknown,
+      overlay: CapabilityState.unknown,
       boot: CapabilityState.unknown,
       battery: CapabilityState.unknown,
       camera: camera,
@@ -108,6 +115,14 @@ class PermissionSnapshot {
           fullScreen ? CapabilityState.granted : CapabilityState.denied;
     }
 
+    final bool? overlay = _asBool(native['overlayGranted']);
+    final CapabilityState overlayState;
+    if (overlay == null) {
+      overlayState = CapabilityState.unknown;
+    } else {
+      overlayState = overlay ? CapabilityState.granted : CapabilityState.denied;
+    }
+
     final bool? bootEnabled = _asBool(native['bootReceiverEnabled']);
     final CapabilityState boot;
     if (bootEnabled == null) {
@@ -130,6 +145,7 @@ class PermissionSnapshot {
       notifications: notifications,
       exactAlarm: exactAlarm,
       fullScreenIntent: fullScreenIntent,
+      overlay: overlayState,
       boot: boot,
       battery: battery,
       camera: camera,

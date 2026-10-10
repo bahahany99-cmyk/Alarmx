@@ -11,6 +11,7 @@ void main() {
     CapabilityState notifications = CapabilityState.granted,
     CapabilityState exactAlarm = CapabilityState.granted,
     CapabilityState fullScreenIntent = CapabilityState.granted,
+    CapabilityState overlay = CapabilityState.granted,
     CapabilityState boot = CapabilityState.granted,
     CapabilityState battery = CapabilityState.granted,
     CapabilityState camera = CapabilityState.granted,
@@ -19,6 +20,7 @@ void main() {
       notifications: notifications,
       exactAlarm: exactAlarm,
       fullScreenIntent: fullScreenIntent,
+      overlay: overlay,
       boot: boot,
       battery: battery,
       camera: camera,
@@ -195,5 +197,13 @@ void main() {
       ReliabilityLevel.critical,
     );
     expect(result.overall, ReliabilityOverall.attentionRequired);
+  });
+
+  test('15: missing overlay is advisory, never critical', () {
+    final ReliabilityReport result = report(
+      snapshotOverride: snapshot(overlay: CapabilityState.denied),
+    );
+    expect(levelOf(result, ReliabilityItemId.overlay), ReliabilityLevel.advisory);
+    expect(result.overall, ReliabilityOverall.mostlyReady);
   });
 }

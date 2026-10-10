@@ -20,6 +20,10 @@ enum PermissionSettingsTarget {
   /// Full-screen-intent page (API 34+).
   fullScreen,
 
+  /// Display-over-other-apps management (all supported APIs): the
+  /// secondary lock-screen popup mechanism on strict OEM skins.
+  overlay,
+
   /// Battery-optimization settings list.
   battery,
 

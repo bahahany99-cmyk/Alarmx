@@ -7,7 +7,8 @@
 // Severity tiers:
 //   - CRITICAL: exact alarm or notifications denied/unknown while an
 //     enabled alarm depends on them.
-//   - IMPORTANT: full-screen, boot, or battery findings (advisory).
+//   - IMPORTANT: full-screen, overlay, boot, or battery findings
+//     (advisory).
 //   - CONDITIONAL: camera findings, only when an enabled alarm actually
 //     has a camera mission (advisory).
 // `notApplicable` states and irrelevant camera findings are ready.
@@ -48,6 +49,7 @@ enum ReliabilityItemId {
   notifications,
   exactAlarm,
   fullScreen,
+  overlay,
   battery,
   boot,
   camera,
@@ -101,6 +103,7 @@ ReliabilityReport computeReliability(ReliabilityInput input) {
       enabled,
     ),
     ReliabilityItemId.fullScreen: _advisoryTier(snapshot.fullScreenIntent),
+    ReliabilityItemId.overlay: _advisoryTier(snapshot.overlay),
     ReliabilityItemId.battery: _advisoryTier(snapshot.battery),
     ReliabilityItemId.boot: _advisoryTier(snapshot.boot),
     ReliabilityItemId.camera: input.cameraRelevant

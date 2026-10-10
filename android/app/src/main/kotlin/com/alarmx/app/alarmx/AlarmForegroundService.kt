@@ -18,6 +18,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
@@ -205,6 +206,7 @@ class AlarmForegroundService : Service() {
         }
         // From here the service is safely in the foreground; sound, vibration
         // and the wake lock are each best-effort and independent.
+        maybeLaunchRingActivityOverOverlay(alarmId)
         isRinging = true
         ringingAlarmId = alarmId
         acquireWakeLock()
@@ -293,6 +295,44 @@ class AlarmForegroundService : Service() {
             ringActivityIntent(alarmId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /**
+     * Overlay fallback launch for strict OEM skins (Realme/ColorOS): when
+     * the system will not honor the full-screen intent but the user
+     * granted "display over other apps", attempts the SAME ring intent
+     * ([ringActivityIntent]) directly instead of relying on the
+     * notification. No parallel pipeline: same target, same extras, same
+     * MainActivity handling — only the launch trigger differs.
+     *
+     * Best-effort and silent: AOSP drops background activity starts
+     * without a visible window, several OEM skins permit them for
+     * overlay-holding apps, and either way the high-priority ringing
+     * notification (posted regardless) remains the delivery mechanism.
+     * The overlay grant is fail-closed: any check failure skips the
+     * launch. No overlay window is ever drawn; the permission is purely
+     * the launch enabler, never an always-on surface.
+     */
+    private fun maybeLaunchRingActivityOverOverlay(alarmId: Int) {
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (canUseFullScreenIntent(notificationManager)) {
+            return
+        }
+        val overlayGranted = try {
+            Settings.canDrawOverlays(this)
+        } catch (e: Exception) {
+            Log.w(TAG, "Overlay check failed; skipping direct ring launch.", e)
+            return
+        }
+        if (!overlayGranted) {
+            return
+        }
+        try {
+            startActivity(ringActivityIntent(alarmId))
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct ring launch blocked; ringing behind notification.", e)
+        }
     }
 
     /**

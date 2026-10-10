@@ -11,8 +11,9 @@
 // instead of faking a button. Settings launches are bounce-guarded:
 // when the app resumes within 1500ms of a launch, the target page
 // closed (near-)instantly (OEM skins that resolve-but-kill deep
-// links), so a message offers the app-info page instead of leaving
-// the user on a silently failed redirect.
+// links), so a message offers a working page instead of leaving the
+// user on a silently failed redirect (the overlay fallback for
+// full-screen links, app info otherwise).
 
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/permissions/capability_state.dart';
@@ -62,6 +63,11 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
   /// verdict. Behavior is identical to the previously inline logic.
   late final SettingsBounceDetector _bounceDetector =
       SettingsBounceDetector(clock: widget.clock);
+
+  /// Target of the latest launched settings action. Read only when the
+  /// detector reports a bounce (which requires a launch), so it always
+  /// names the page that just bounced.
+  PermissionSettingsTarget? _lastTarget;
 
   @override
   void initState() {
@@ -130,6 +136,7 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
       // Arm bounce detection: the resume observer judges whether the
       // target page actually hosted the user (see [_maybeReportBounce]).
       // Generic across targets — any OEM-broken deep link trips it.
+      _lastTarget = target;
       _bounceDetector.arm();
     }
     // Explicit refresh after returning; the resume observer refreshes too.
@@ -138,24 +145,34 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
 
   /// Reports a settings "bounce": the app resumed within [_bounceThreshold]
   /// of a launched settings action, meaning the target page closed
-  /// (near-)instantly instead of hosting the user. Offers the app-info
-  /// page (confirmed working where deep links bounce) via an explicit
-  /// action — never silently retries the broken intent. A slower return
-  /// is a genuine visit and does nothing extra. Consumes the armed stamp
-  /// exactly once, so each launch gets one verdict and plain resumes
-  /// (no launch) stay silent.
+  /// (near-)instantly instead of hosting the user. Offers a working page
+  /// via an explicit action — never silently retries the broken intent:
+  /// the overlay fallback for full-screen links (the per-app page is
+  /// missing on strict OEM skins while overlay still delivers the
+  /// popup), app info (confirmed working where deep links bounce)
+  /// otherwise. A slower return is a genuine visit and does nothing
+  /// extra. Consumes the armed stamp exactly once, so each launch gets
+  /// one verdict and plain resumes (no launch) stay silent.
   void _maybeReportBounce() {
     if (!_bounceDetector.consumeResume() || !mounted) {
       return;
     }
+    final bool fullScreenBounced =
+        _lastTarget == PermissionSettingsTarget.fullScreen;
     final AppStrings strings = AppStrings.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(strings.permissionCenterBounceMessage),
         action: SnackBarAction(
-          label: strings.permissionCenterBounceFallback,
+          label: fullScreenBounced
+              ? strings.permissionCenterBounceOverlay
+              : strings.permissionCenterBounceFallback,
           onPressed: () {
-            _openSettings(PermissionSettingsTarget.appDetails);
+            _openSettings(
+              fullScreenBounced
+                  ? PermissionSettingsTarget.overlay
+                  : PermissionSettingsTarget.appDetails,
+            );
           },
         ),
       ),
@@ -203,7 +220,7 @@ class _CenterLoaded extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Fixed seven rows: a Column builds every row eagerly (a lazy list
+    // Fixed eight rows: a Column builds every row eagerly (a lazy list
     // would only inflate visible rows, hiding the rest from semantics
     // and tests until scrolled).
     return SingleChildScrollView(
@@ -221,6 +238,10 @@ class _CenterLoaded extends StatelessWidget {
           ),
           _CenterItemCard(
             item: _FullScreenItem(data),
+            onAction: onAction,
+          ),
+          _CenterItemCard(
+            item: _OverlayItem(data),
             onAction: onAction,
           ),
           _CenterItemCard(
@@ -371,6 +392,16 @@ _CenterItem _FullScreenItem(ReliabilityData data) {
     target: state == CapabilityState.notApplicable
         ? null
         : PermissionSettingsTarget.fullScreen,
+  );
+}
+
+_CenterItem _OverlayItem(ReliabilityData data) {
+  return _CenterItem(
+    id: 'overlay',
+    icon: Icons.layers,
+    state: data.snapshot.overlay,
+    level: data.report.levels[ReliabilityItemId.overlay]!,
+    target: PermissionSettingsTarget.overlay,
   );
 }
 
@@ -535,6 +566,8 @@ class _CenterItemCard extends StatelessWidget {
         return strings.permExactAlarmTitle;
       case 'fullScreen':
         return strings.permFullScreenTitle;
+      case 'overlay':
+        return strings.permOverlayTitle;
       case 'battery':
         return strings.permBatteryTitle;
       case 'boot':
@@ -555,6 +588,8 @@ class _CenterItemCard extends StatelessWidget {
         return strings.permExactAlarmExplain;
       case 'fullScreen':
         return strings.permFullScreenExplain;
+      case 'overlay':
+        return strings.permOverlayExplain;
       case 'battery':
         return strings.permBatteryExplain;
       case 'boot':
@@ -575,6 +610,7 @@ class _CenterItemCard extends StatelessWidget {
       case 'boot':
         return strings.permTagRequired;
       case 'battery':
+      case 'overlay':
         return strings.permTagRecommended;
       case 'camera':
         return strings.permTagConditional;

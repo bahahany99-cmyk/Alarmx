@@ -259,6 +259,8 @@ class AppStrings {
   String get permissionCenterActionFailed => text('permissionCenterActionFailed');
   String get permissionCenterBounceMessage => text('permissionCenterBounceMessage');
   String get permissionCenterBounceFallback => text('permissionCenterBounceFallback');
+  String get permissionCenterBounceOverlay =>
+      text('permissionCenterBounceOverlay');
   String get onboardingTitle => text('onboardingTitle');
   String get onboardingNotificationsTitle => text('onboardingNotificationsTitle');
   String get onboardingNotificationsWhy => text('onboardingNotificationsWhy');
@@ -286,6 +288,9 @@ class AppStrings {
       text('onboardingSpecialAccessAction');
   String get onboardingFullScreenBounceNote =>
       text('onboardingFullScreenBounceNote');
+  String get onboardingOverlayInstead => text('onboardingOverlayInstead');
+  String get onboardingOverlayFallbackNote =>
+      text('onboardingOverlayFallbackNote');
   String get permissionCenterFix => text('permissionCenterFix');
   String get reliabilityReliable => text('reliabilityReliable');
   String get reliabilityMostly => text('reliabilityMostly');
@@ -299,6 +304,8 @@ class AppStrings {
   String get permExactAlarmExplain => text('permExactAlarmExplain');
   String get permFullScreenTitle => text('permFullScreenTitle');
   String get permFullScreenExplain => text('permFullScreenExplain');
+  String get permOverlayTitle => text('permOverlayTitle');
+  String get permOverlayExplain => text('permOverlayExplain');
   String get permBatteryTitle => text('permBatteryTitle');
   String get permBatteryExplain => text('permBatteryExplain');
   String get permBootTitle => text('permBootTitle');
@@ -518,6 +525,7 @@ class AppStrings {
     'permissionCenterActionFailed': 'تعذّر فتح صفحة الإعدادات',
     'permissionCenterBounceMessage': 'تعذّر فتح صفحة الإعدادات المطلوبة على هذا الجهاز',
     'permissionCenterBounceFallback': 'فتح معلومات التطبيق',
+    'permissionCenterBounceOverlay': 'فتح إعداد الظهور فوق التطبيقات',
     'onboardingTitle': 'إعداد AlarmX',
     'onboardingNotificationsTitle': 'الإشعارات',
     'onboardingNotificationsWhy': 'تعمل المنبهات عبر إشعار. بدون هذا الإذن لن تتمكن المنبهات من إيقاظك.',
@@ -543,6 +551,8 @@ class AppStrings {
     'onboardingFullScreenSkipWhy': 'إذا كان هذا الإعداد غير موجود على هاتفك، يمكنك تخطيه: ستظل المنبهات ترن كإشعارات عالية الأولوية، ويمكنك السماح بمنبهات ملء الشاشة لاحقًا من مركز الصلاحيات.',
     'onboardingSpecialAccessAction': 'فتح الوصول الخاص',
     'onboardingFullScreenBounceNote': 'أُغلقت صفحة الإعدادات فورًا على هذا الجهاز. يمكنك فتح صفحة الوصول الخاص بدلًا من ذلك.',
+    'onboardingOverlayInstead': 'السماح بالظهور فوق التطبيقات الأخرى',
+    'onboardingOverlayFallbackNote': 'تنبيهات ملء الشاشة متوقفة. ستظهر شاشة الرنين باستخدام الظهور فوق التطبيقات الأخرى.',
     'permissionCenterFix': 'فتح الإعدادات',
     'reliabilityReliable': 'جاهز',
     'reliabilityMostly': 'شبه جاهز',
@@ -556,6 +566,8 @@ class AppStrings {
     'permExactAlarmExplain': 'مطلوب لرنين المنبه في وقته المحدد تمامًا.',
     'permFullScreenTitle': 'ملء الشاشة',
     'permFullScreenExplain': 'يسمح بفتح شاشة الرنين تلقائيًا فوق شاشة القفل.',
+    'permOverlayTitle': 'الظهور فوق التطبيقات الأخرى',
+    'permOverlayExplain': 'إذا كانت تنبيهات ملء الشاشة محظورة، يتيح هذا ظهور شاشة الرنين فوق شاشة القفل.',
     'permBatteryTitle': 'البطارية',
     'permBatteryExplain': 'مستحسن وليس إلزاميًا، وقد يحسّن الموثوقية على بعض الأجهزة.',
     'permBootTitle': 'إعادة التشغيل',
@@ -777,6 +789,7 @@ class AppStrings {
     'permissionCenterActionFailed': 'Could not open the settings page',
     'permissionCenterBounceMessage': 'The requested settings page could not be opened on this device',
     'permissionCenterBounceFallback': 'Open app info',
+    'permissionCenterBounceOverlay': 'Open overlay settings',
     'onboardingTitle': 'Set up AlarmX',
     'onboardingNotificationsTitle': 'Notifications',
     'onboardingNotificationsWhy': 'Alarms ring through a notification. Without this, alarms cannot wake you.',
@@ -802,6 +815,8 @@ class AppStrings {
     'onboardingFullScreenSkipWhy': 'If this setting is missing on your phone, skip it: alarms will still ring as high-priority notifications, and you can allow full-screen alarms later in Permission Center.',
     'onboardingSpecialAccessAction': 'Open special access',
     'onboardingFullScreenBounceNote': 'That settings page closed immediately on this device. You can open the special access page instead.',
+    'onboardingOverlayInstead': 'Allow display over other apps',
+    'onboardingOverlayFallbackNote': 'Full-screen alerts are off. Alarms will pop up using display over other apps.',
     'permissionCenterFix': 'Open Settings',
     'reliabilityReliable': 'Ready',
     'reliabilityMostly': 'Mostly ready',
@@ -815,6 +830,8 @@ class AppStrings {
     'permExactAlarmExplain': 'Required for alarms to ring at their exact time.',
     'permFullScreenTitle': 'Full screen',
     'permFullScreenExplain': 'Lets the ringing screen open automatically over the lock screen.',
+    'permOverlayTitle': 'Display over other apps',
+    'permOverlayExplain': 'If full-screen alerts are blocked, this lets the ringing screen appear on top of the lock screen.',
     'permBatteryTitle': 'Battery',
     'permBatteryExplain': 'Recommended, not mandatory, and may improve reliability on some devices.',
     'permBootTitle': 'Restart',

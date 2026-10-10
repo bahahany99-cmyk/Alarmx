@@ -61,7 +61,7 @@ void main() {
     );
   }
 
-  testWidgets('renders all seven items', (WidgetTester tester) async {
+  testWidgets('renders all eight items', (WidgetTester tester) async {
     await stack.insertAlarm(label: 'Work');
     await pumpCenter(tester, stack);
 
@@ -69,6 +69,7 @@ void main() {
     expect(find.text(en.permNotificationsTitle, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permExactAlarmTitle, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permFullScreenTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permOverlayTitle, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permBatteryTitle, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permBootTitle, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permCameraTitle, skipOffstage: false), findsOneWidget);
@@ -95,8 +96,8 @@ void main() {
     await pumpCenter(tester, stack);
 
     expect(find.text(en.reliabilityExplainReliable, skipOffstage: false), findsOneWidget);
-    // Six rows plus the overall title share the Ready wording.
-    expect(find.text(en.permStateReady, skipOffstage: false), findsNWidgets(7));
+    // Seven rows plus the overall title share the Ready wording.
+    expect(find.text(en.permStateReady, skipOffstage: false), findsNWidgets(8));
     expect(find.text('1', skipOffstage: false), findsOneWidget);
     expect(find.text(en.permTagRequired, skipOffstage: false), findsNWidgets(4));
     await finishWidgetTest(tester, stack);
@@ -153,7 +154,8 @@ void main() {
 
     expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
     expect(find.text(en.permStateNotExempt, skipOffstage: false), findsOneWidget);
-    expect(find.text(en.permTagRecommended, skipOffstage: false), findsOneWidget);
+    // Battery and overlay rows both carry the Recommended tag.
+    expect(find.text(en.permTagRecommended, skipOffstage: false), findsNWidgets(2));
     await finishWidgetTest(tester, stack);
   });
 
@@ -354,6 +356,72 @@ void main() {
       <PermissionSettingsTarget>[
         PermissionSettingsTarget.notifications,
         PermissionSettingsTarget.appDetails,
+      ],
+    );
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('overlay row action opens overlay settings',
+      (WidgetTester tester) async {
+    await stack.insertAlarm(label: 'Work');
+    final Map<String, Object?> denied = fakeGrantedSnapshot();
+    denied['overlayGranted'] = false;
+    final FakePermissionSystemBridge bridge =
+        FakePermissionSystemBridge(snapshot: denied);
+    await pumpCenter(tester, stack, bridge: bridge);
+
+    expect(find.text(en.permOverlayTitle, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.permStateDenied, skipOffstage: false), findsOneWidget);
+    expect(find.text(en.reliabilityMostly, skipOffstage: false), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_overlay'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_overlay'), skipOffstage: false));
+    await pumpSettle(tester);
+
+    expect(bridge.opened, <PermissionSettingsTarget>[
+      PermissionSettingsTarget.overlay,
+    ]);
+    expect(find.text(en.permissionCenterActionFailed, skipOffstage: false), findsNothing);
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('full-screen bounce offers overlay settings',
+      (WidgetTester tester) async {
+    await stack.insertAlarm(label: 'Work');
+    final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
+    await pumpCenter(tester, stack, bridge: bridge);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permission_action_fullScreen'), skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(find.byKey(const Key('permission_action_fullScreen'), skipOffstage: false));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[PermissionSettingsTarget.fullScreen],
+    );
+
+    // Near-instant resume: the per-app page bounced; the overlay fallback
+    // is offered instead of the app-info page.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+    expect(find.text(en.permissionCenterBounceMessage), findsOneWidget);
+    expect(find.text(en.permissionCenterBounceOverlay), findsOneWidget);
+    expect(find.text(en.permissionCenterBounceFallback), findsNothing);
+
+    await tester.tap(find.text(en.permissionCenterBounceOverlay));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[
+        PermissionSettingsTarget.fullScreen,
+        PermissionSettingsTarget.overlay,
       ],
     );
     await finishWidgetTest(tester, stack);
