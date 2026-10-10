@@ -183,7 +183,8 @@ class AlarmSchedulingCoordinator {
   /// Flow: load -> skip when disabled (cancelling strays) -> reject when
   /// [firedTriggerAt] no longer matches the stored schedule (stale,
   /// duplicate, cancelled, or already-handled fire; the database is left
-  /// untouched) -> complete one-time alarms (cancel stray, clear trigger) ->
+  /// untouched) -> complete one-time alarms (disable, cancel stray,
+  /// clear trigger) ->
   /// otherwise require exact-alarm permission -> cancel previous native
   /// schedule -> schedule the next occurrence strictly after
   /// [firedTriggerAt] -> persist it to `nextTriggerAt`. Fresh row state is
@@ -223,6 +224,7 @@ class AlarmSchedulingCoordinator {
     final AlarmSchedule schedule = _toSchedule(alarm);
     if (schedule.repeatType == RepeatType.once) {
       try {
+        await _repository.setAlarmEnabled(alarmId, false);
         await _scheduler.cancelAlarm(alarmId: alarmId);
         await _clearNextTrigger(alarmId);
       } catch (e) {

@@ -38,10 +38,11 @@ Future<void> pumpMath(
   MissionEntry entry, {
   required VoidCallback onCompleted,
   int seed = 11,
+  String language = AppLanguage.english,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      locale: const Locale(AppLanguage.english),
+      locale: Locale(language),
       supportedLocales: testLocales,
       localizationsDelegates: testDelegates,
       home: Scaffold(
@@ -288,6 +289,26 @@ void main() {
         onCompleted: () {},
       );
       expect(find.text(en.ringingSkippedInvalid), findsOneWidget);
+    });
+
+    testWidgets('equation renders LTR under an RTL locale',
+        (WidgetTester tester) async {
+      const int seed = 11;
+      await pumpMath(
+        tester,
+        mathEntry(easy3),
+        onCompleted: () {},
+        seed: seed,
+        language: AppLanguage.arabic,
+      );
+      final List<MathQuestion> expected = generateWithSeed(easy3, seed);
+      final String display = expected.first.display();
+      expect(find.text(display), findsOneWidget);
+      final Element element = tester.element(find.text(display));
+      final Directionality? directionality =
+          element.findAncestorWidgetOfExactType<Directionality>();
+      expect(directionality, isNotNull);
+      expect(directionality!.textDirection, TextDirection.ltr);
     });
   });
 }

@@ -102,10 +102,15 @@ class _MathMissionWidgetState extends State<MathMissionWidget> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(
-                  _mission.current.display(),
-                  style: theme.textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
+                // Equations render left-to-right even under RTL locales:
+                // without this the numbers/operators visually reverse.
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    _mission.current.display(),
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ),

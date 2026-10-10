@@ -403,6 +403,7 @@ void main() {
       expect(result, isA<AlarmNotSchedulable>());
       expect(scheduler.scheduledIds, <int>[id]);
       expect((await alarms.getAlarmById(id))!.nextTriggerAt, isNull);
+      expect((await alarms.getAlarmById(id))!.enabled, isFalse);
     });
 
     test('daily alarm chains to tomorrow', () async {
