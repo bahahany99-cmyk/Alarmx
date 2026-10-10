@@ -21,10 +21,12 @@ import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/repositories/onboarding_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/missions/permissions/camera_permission.dart';
+import 'package:alarmx/features/onboarding/notification_permission_gate.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/home/home_screen.dart';
@@ -306,6 +308,39 @@ class FakeCameraStatusGate implements CameraPermissionGate {
 
   @override
   Future<void> openSettings() async {}
+}
+
+/// Scripted notification permission gate.
+class FakeNotificationGate implements NotificationPermissionGate {
+  FakeNotificationGate([
+    this.outcome = NotificationPermissionOutcome.granted,
+  ]);
+
+  NotificationPermissionOutcome outcome;
+  int requests = 0;
+
+  @override
+  Future<NotificationPermissionOutcome> requestNotifications() async {
+    requests++;
+    return outcome;
+  }
+}
+
+/// In-memory onboarding completion store.
+class FakeOnboardingRepository implements OnboardingRepository {
+  FakeOnboardingRepository([this.completed = false]);
+
+  bool completed;
+  int completions = 0;
+
+  @override
+  Future<bool> isOnboardingComplete() async => completed;
+
+  @override
+  Future<void> setOnboardingComplete() async {
+    completed = true;
+    completions++;
+  }
 }
 
 Future<void> pumpHome(

@@ -259,6 +259,27 @@ class AppStrings {
   String get permissionCenterActionFailed => text('permissionCenterActionFailed');
   String get permissionCenterBounceMessage => text('permissionCenterBounceMessage');
   String get permissionCenterBounceFallback => text('permissionCenterBounceFallback');
+  String get onboardingTitle => text('onboardingTitle');
+  String get onboardingNotificationsTitle => text('onboardingNotificationsTitle');
+  String get onboardingNotificationsWhy => text('onboardingNotificationsWhy');
+  String get onboardingNotificationsAction => text('onboardingNotificationsAction');
+  String get onboardingExactTitle => text('onboardingExactTitle');
+  String get onboardingExactWhy => text('onboardingExactWhy');
+  String get onboardingFullScreenTitle => text('onboardingFullScreenTitle');
+  String get onboardingFullScreenWhy => text('onboardingFullScreenWhy');
+  String get onboardingBootTitle => text('onboardingBootTitle');
+  String get onboardingBootWhy => text('onboardingBootWhy');
+  String get onboardingBatteryTitle => text('onboardingBatteryTitle');
+  String get onboardingBatteryWhy => text('onboardingBatteryWhy');
+  String get onboardingOpenSettings => text('onboardingOpenSettings');
+  String get onboardingNotGranted => text('onboardingNotGranted');
+  String get onboardingContinue => text('onboardingContinue');
+  String get onboardingSkip => text('onboardingSkip');
+  String get onboardingDone => text('onboardingDone');
+  String get onboardingCompleteTitle => text('onboardingCompleteTitle');
+  String get onboardingCompleteBody => text('onboardingCompleteBody');
+  String get onboardingBounceNote => text('onboardingBounceNote');
+  String get onboardingAppInfoAction => text('onboardingAppInfoAction');
   String get permissionCenterFix => text('permissionCenterFix');
   String get reliabilityReliable => text('reliabilityReliable');
   String get reliabilityMostly => text('reliabilityMostly');
@@ -491,6 +512,27 @@ class AppStrings {
     'permissionCenterActionFailed': 'تعذّر فتح صفحة الإعدادات',
     'permissionCenterBounceMessage': 'تعذّر فتح صفحة الإعدادات المطلوبة على هذا الجهاز',
     'permissionCenterBounceFallback': 'فتح معلومات التطبيق',
+    'onboardingTitle': 'إعداد AlarmX',
+    'onboardingNotificationsTitle': 'السماح بالإشعارات',
+    'onboardingNotificationsWhy': 'تعمل المنبهات عبر إشعار. بدون هذا الإذن لن تتمكن المنبهات من إيقاظك.',
+    'onboardingNotificationsAction': 'السماح بالإشعارات',
+    'onboardingExactTitle': 'السماح بالتنبيه الدقيق',
+    'onboardingExactWhy': 'يجب أن يعمل المنبه في الدقيقة المحددة تمامًا. بدون هذا قد يؤخره النظام.',
+    'onboardingFullScreenTitle': 'السماح بملء الشاشة',
+    'onboardingFullScreenWhy': 'يجب أن تظهر شاشة المنبه فوق شاشة القفل لتتمكن من إيقافه.',
+    'onboardingBootTitle': 'الموثوقية بعد إعادة التشغيل',
+    'onboardingBootWhy': 'يستعيد AlarmX المنبهات بعد إعادة تشغيل الهاتف. يؤكد هذا الفحص جاهزية ذلك.',
+    'onboardingBatteryTitle': 'تحسين البطارية',
+    'onboardingBatteryWhy': 'بعض الهواتف تؤخر المنبهات لتوفير البطارية. استثناء AlarmX يحافظ على دقة المواعيد. اختياري — يمكنك التخطي.',
+    'onboardingOpenSettings': 'فتح الإعدادات',
+    'onboardingNotGranted': 'لم يُمنح بعد',
+    'onboardingContinue': 'متابعة',
+    'onboardingSkip': 'تخطي',
+    'onboardingDone': 'تم',
+    'onboardingCompleteTitle': 'اكتمل الإعداد',
+    'onboardingCompleteBody': 'أصبح AlarmX جاهزًا. يمكنك مراجعة هذه الأذونات في أي وقت من مركز الأذونات.',
+    'onboardingBounceNote': 'أُغلقت صفحة الإعدادات فورًا على هذا الجهاز. يمكنك فتح صفحة معلومات التطبيق بدلًا من ذلك.',
+    'onboardingAppInfoAction': 'فتح معلومات التطبيق',
     'permissionCenterFix': 'فتح الإعدادات',
     'reliabilityReliable': 'جاهز',
     'reliabilityMostly': 'شبه جاهز',
@@ -725,6 +767,27 @@ class AppStrings {
     'permissionCenterActionFailed': 'Could not open the settings page',
     'permissionCenterBounceMessage': 'The requested settings page could not be opened on this device',
     'permissionCenterBounceFallback': 'Open app info',
+    'onboardingTitle': 'Set up AlarmX',
+    'onboardingNotificationsTitle': 'Allow notifications',
+    'onboardingNotificationsWhy': 'Alarms ring through a notification. Without this, alarms cannot wake you.',
+    'onboardingNotificationsAction': 'Allow notifications',
+    'onboardingExactTitle': 'Allow exact alarms',
+    'onboardingExactWhy': 'Alarms must fire at the exact minute. Without this, Android may delay them.',
+    'onboardingFullScreenTitle': 'Allow full-screen alarms',
+    'onboardingFullScreenWhy': 'The alarm screen must appear over the lock screen so you can stop it.',
+    'onboardingBootTitle': 'Restart reliability',
+    'onboardingBootWhy': 'AlarmX restores your alarms after a phone restart. This check confirms that capability is ready.',
+    'onboardingBatteryTitle': 'Battery optimization',
+    'onboardingBatteryWhy': 'Some phones delay alarms to save battery. Exempting AlarmX keeps alarms on time. Optional — you can skip this.',
+    'onboardingOpenSettings': 'Open settings',
+    'onboardingNotGranted': 'Not granted yet',
+    'onboardingContinue': 'Continue',
+    'onboardingSkip': 'Skip',
+    'onboardingDone': 'Done',
+    'onboardingCompleteTitle': "You're all set",
+    'onboardingCompleteBody': 'AlarmX is ready. You can review these permissions anytime in Permission Center.',
+    'onboardingBounceNote': 'That settings page closed immediately on this device. You can open the app info page instead.',
+    'onboardingAppInfoAction': 'Open app info',
     'permissionCenterFix': 'Open Settings',
     'reliabilityReliable': 'Ready',
     'reliabilityMostly': 'Mostly ready',

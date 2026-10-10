@@ -17,6 +17,7 @@
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/permissions/capability_state.dart';
 import 'package:alarmx/core/permissions/permission_bridge.dart';
+import 'package:alarmx/core/permissions/settings_bounce_detector.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/missions/permissions/camera_permission.dart';
@@ -55,18 +56,12 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
   ReliabilityData? _data;
   int _reloadToken = 0;
 
-  /// Bounce threshold: a settings visit shorter than this means the target
-  /// page closed (near-)instantly instead of hosting the user (observed on
-  /// OEM skins that resolve-but-kill certain deep links, well under 1s).
-  /// Far below any genuine visit, so normal use never trips it.
-  static const Duration _bounceThreshold = Duration(milliseconds: 1500);
-
-  /// When the last settings launch returned launched=true, awaiting its
-  /// resume verdict. Consumed (nulled) on the first resume after the
-  /// launch, whatever the verdict, so each launch gets exactly one.
-  DateTime? _settingsLaunchAt;
-
-  DateTime _now() => widget.clock?.call() ?? DateTime.now();
+  /// Shared bounce detector: armed on every launched settings action,
+  /// judged on the next resume (see [_maybeReportBounce]). Threshold and
+  /// verdict semantics are the detector's; this screen only renders the
+  /// verdict. Behavior is identical to the previously inline logic.
+  late final SettingsBounceDetector _bounceDetector =
+      SettingsBounceDetector(clock: widget.clock);
 
   @override
   void initState() {
@@ -135,7 +130,7 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
       // Arm bounce detection: the resume observer judges whether the
       // target page actually hosted the user (see [_maybeReportBounce]).
       // Generic across targets — any OEM-broken deep link trips it.
-      _settingsLaunchAt = _now();
+      _bounceDetector.arm();
     }
     // Explicit refresh after returning; the resume observer refreshes too.
     await _reload();
@@ -150,12 +145,7 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen>
   /// exactly once, so each launch gets one verdict and plain resumes
   /// (no launch) stay silent.
   void _maybeReportBounce() {
-    final DateTime? launchedAt = _settingsLaunchAt;
-    _settingsLaunchAt = null;
-    if (launchedAt == null || !mounted) {
-      return;
-    }
-    if (_now().difference(launchedAt) >= _bounceThreshold) {
+    if (!_bounceDetector.consumeResume() || !mounted) {
       return;
     }
     final AppStrings strings = AppStrings.of(context);

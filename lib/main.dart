@@ -20,6 +20,7 @@ import 'package:alarmx/core/permissions/permission_bridge.dart';
 import 'package:alarmx/core/repositories/alarm_history_repository.dart';
 import 'package:alarmx/core/repositories/alarm_repository.dart';
 import 'package:alarmx/core/repositories/app_settings_repository.dart';
+import 'package:alarmx/core/repositories/onboarding_repository.dart';
 import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/repositories/mission_repository.dart';
 import 'package:alarmx/core/scheduling/alarm_schedule_result.dart';
@@ -27,6 +28,8 @@ import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/home/home_screen.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/missions/permissions/camera_permission.dart';
+import 'package:alarmx/features/onboarding/notification_permission_gate.dart';
+import 'package:alarmx/features/onboarding/onboarding_screen.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_alarm_bridge.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_launch.dart';
 import 'package:alarmx/features/ringing_alarm/ringing_mission_screen.dart';
@@ -63,6 +66,8 @@ Future<void> main() async {
       ringingBridge: MethodChannelRingingBridge(),
       permissionBridge: const MethodChannelPermissionBridge(),
       cameraGate: const PermissionHandlerCameraGate(),
+      notificationGate: const PermissionHandlerNotificationGate(),
+      onboarding: DriftOnboardingRepository(db),
     ),
   );
 }
@@ -83,6 +88,8 @@ class AlarmxApp extends StatefulWidget {
     this.ringingBridge,
     this.permissionBridge = const MethodChannelPermissionBridge(),
     this.cameraGate = const PermissionHandlerCameraGate(),
+    this.notificationGate = const PermissionHandlerNotificationGate(),
+    this.onboarding,
     this.events,
   });
 
@@ -103,6 +110,15 @@ class AlarmxApp extends StatefulWidget {
 
   /// Camera gate for reliability status checks (never requests).
   final CameraPermissionGate cameraGate;
+
+  /// Notification gate for the onboarding runtime dialog; production uses
+  /// the permission_handler gate, tests use fakes.
+  final NotificationPermissionGate notificationGate;
+
+  /// Onboarding completion store; `null` (tests, plain unit shells)
+  /// skips onboarding and boots Home. Production passes the drift store
+  /// so first launch routes into the onboarding flow.
+  final OnboardingRepository? onboarding;
 
   /// Event listener override for tests; production uses a live one.
   final NativeAlarmEvents? events;
@@ -125,6 +141,14 @@ class _AlarmxAppState extends State<AlarmxApp> {
 
   /// True once a ringing session finished and the shell returned Home.
   bool _ringingFinished = false;
+
+  /// Onboarding completion, read once per shell (null repository reads
+  /// complete, skipping the flow).
+  late final Future<bool> _onboardingFuture =
+      widget.onboarding?.isOnboardingComplete() ?? Future<bool>.value(true);
+
+  /// True once onboarding finished this session and the shell entered Home.
+  bool _onboardingDone = false;
 
   /// Session language, set by the Home menu (also persisted best-effort).
   String? _languageOverride;
@@ -246,17 +270,50 @@ class _AlarmxAppState extends State<AlarmxApp> {
                     final RingingLaunch? launch = snapshot.data;
                     final RingingAlarmBridge? bridge = widget.ringingBridge;
                     if (launch == null || bridge == null) {
-                      return HomeScreen(
-                        controller: _controller,
-                        missionService: widget.missionService,
-                        pinService: _pinService,
-                        settings: widget.settings,
-                        history: widget.history,
-                        alarmRepository: widget.repository,
-                        permissionBridge: widget.permissionBridge,
-                        cameraGate: widget.cameraGate,
-                        languageCode: languageCode,
-                        onLanguageChanged: _setLanguage,
+                      return FutureBuilder<bool>(
+                        future: _onboardingFuture,
+                        builder: (
+                          BuildContext context,
+                          AsyncSnapshot<bool> onboarding,
+                        ) {
+                          if (onboarding.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Scaffold(
+                              body: Center(
+                                  child: CircularProgressIndicator()),
+                            );
+                          }
+                          // Ringing already won above; onboarding gates Home
+                          // until the flow completes to the end. A null
+                          // repository (tests, plain shells) reads complete.
+                          if (onboarding.data != true && !_onboardingDone) {
+                            return OnboardingScreen(
+                              bridge: widget.permissionBridge,
+                              notificationGate: widget.notificationGate,
+                              // Non-null: a null repository resolves true.
+                              onboarding: widget.onboarding!,
+                              onFinished: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _onboardingDone = true;
+                                  });
+                                }
+                              },
+                            );
+                          }
+                          return HomeScreen(
+                            controller: _controller,
+                            missionService: widget.missionService,
+                            pinService: _pinService,
+                            settings: widget.settings,
+                            history: widget.history,
+                            alarmRepository: widget.repository,
+                            permissionBridge: widget.permissionBridge,
+                            cameraGate: widget.cameraGate,
+                            languageCode: languageCode,
+                            onLanguageChanged: _setLanguage,
+                          );
+                        },
                       );
                     }
                     return RingingMissionScreen(
