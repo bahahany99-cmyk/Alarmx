@@ -30,6 +30,8 @@ import 'package:alarmx/features/onboarding/notification_permission_gate.dart';
 import 'package:alarmx/core/scheduling/alarm_scheduling_coordinator.dart';
 import 'package:alarmx/features/alarm_editor/alarm_editor_screen.dart';
 import 'package:alarmx/features/alarm_editor/audio_picker_gate.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
+import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:alarmx/features/home/home_screen.dart';
 import 'package:alarmx/main.dart';
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
@@ -390,6 +392,8 @@ Future<void> pumpEditor(
   String language = AppLanguage.english,
   int? alarmId,
   AudioPickerGate? audioPicker,
+  PhotoCaptureSource? photoCaptureSource,
+  FingerprintSource? photoFingerprintSource,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -404,6 +408,8 @@ Future<void> pumpEditor(
               settings: stack.settings,
               audioPicker:
                   audioPicker ?? const MethodChannelAudioPicker(),
+              photoCaptureSource: photoCaptureSource,
+              photoFingerprintSource: photoFingerprintSource,
             )
           : AlarmEditorScreen.edit(
               controller: stack.controller,
@@ -412,6 +418,8 @@ Future<void> pumpEditor(
               settings: stack.settings,
               audioPicker:
                   audioPicker ?? const MethodChannelAudioPicker(),
+              photoCaptureSource: photoCaptureSource,
+              photoFingerprintSource: photoFingerprintSource,
               alarmId: alarmId,
             ),
     ),

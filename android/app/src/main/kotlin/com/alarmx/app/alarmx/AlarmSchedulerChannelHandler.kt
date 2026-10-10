@@ -8,9 +8,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
-import android.media.RingtoneManager
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
@@ -35,6 +41,10 @@ import io.flutter.plugin.common.MethodChannel
  *   - `pickSystemRingtone`  args: `{ "existingUri": String? }`: opens
  *     the system ringtone picker (alarm type). Returns the picked
  *     ringtone URI string, or null on cancel / failure / headless.
+ *   - `getAmbientLightLux`  args: `{}`: one-shot ambient-light reading
+ *     in lux for the Light Catch mission, or null when the device has
+ *     no light sensor / no reading arrives within 2s. The listener is
+ *     unregistered on every path; nothing listens persistently.
  *   - `cancelAlarm`         args: `{ "alarmId": Int }`
  *   - `canScheduleExactAlarms`  args: `{}`
  *   - `getRingingLaunch`  args: `{}`: the pending Flutter ring launch
@@ -211,6 +221,10 @@ class AlarmSchedulerChannelHandler(
                         call.argument<String>("existingUri"),
                         result,
                     )
+                }
+
+                "getAmbientLightLux" -> {
+                    readAmbientLightLux(result)
                 }
 
                 else -> result.notImplemented()
@@ -595,5 +609,68 @@ class AlarmSchedulerChannelHandler(
             Log.w("AlarmX", "System ringtone picker failed.", t)
             result.success(null)
         }
+    }
+
+    /**
+     * One-shot ambient-light reading in lux. Registers a listener only
+     * until the first sample arrives (or 2s elapse), then unregisters on
+     * every path — the mission re-polls per sample, so nothing ever
+     * listens persistently. Answers null when the device has no light
+     * sensor, registration fails, or no sample arrives in time.
+     */
+    private fun readAmbientLightLux(result: MethodChannel.Result) {
+        val sensorManager =
+            context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
+        if (sensorManager == null || sensor == null) {
+            result.success(null)
+            return
+        }
+        var answered = false
+        val mainHandler = Handler(Looper.getMainLooper())
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (answered) {
+                    return
+                }
+                answered = true
+                try {
+                    sensorManager.unregisterListener(this)
+                } catch (_: Exception) {
+                }
+                mainHandler.removeCallbacksAndMessages(null)
+                result.success(event.values.firstOrNull()?.toDouble())
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            }
+        }
+        try {
+            val registered = sensorManager.registerListener(
+                listener,
+                sensor,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                mainHandler,
+            )
+            if (!registered) {
+                result.success(null)
+                return
+            }
+        } catch (t: Throwable) {
+            Log.w("AlarmX", "Light sensor registration failed.", t)
+            result.success(null)
+            return
+        }
+        mainHandler.postDelayed({
+            if (answered) {
+                return@postDelayed
+            }
+            answered = true
+            try {
+                sensorManager.unregisterListener(listener)
+            } catch (_: Exception) {
+            }
+            result.success(null)
+        }, 2000L)
     }
 }

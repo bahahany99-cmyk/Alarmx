@@ -129,14 +129,16 @@ void main() {
               }
             case MathDifficulty.hard:
               if (q.operator == MathOperator.multiply) {
-                expect(q.a >= 2 && q.a <= 15, isTrue);
-                expect(q.b >= 2 && q.b <= 15, isTrue);
+                expect(q.a >= 12 && q.a <= 25, isTrue);
+                expect(q.b >= 3 && q.b <= 12, isTrue);
               } else if (q.operator == MathOperator.divide) {
-                expect(q.b >= 2 && q.b <= 12, isTrue);
+                expect(q.b >= 3 && q.b <= 12, isTrue);
                 expect(q.a % q.b, 0);
+                expect(q.answer >= 12 && q.answer <= 49, isTrue);
+                expect(q.a >= 10, isTrue);
               } else {
-                expect(q.a >= 1 && q.a <= 200, isTrue);
-                expect(q.b >= 1 && q.b <= 200, isTrue);
+                expect(q.a >= 10 && q.a <= 200, isTrue);
+                expect(q.b >= 10 && q.b <= 200, isTrue);
               }
           }
           if (q.operator == MathOperator.subtract) {
@@ -157,6 +159,38 @@ void main() {
 
     test('hard shapes stay in range with exact division', () {
       checkRanges(MathDifficulty.hard);
+    });
+
+    test('hard sets cover every operator from four questions up', () {
+      for (int seed = 0; seed < 40; seed++) {
+        for (final int count in <int>[4, 5, 10]) {
+          final MathMissionConfig config = MathMissionConfig(
+            questionCount: count,
+            difficulty: MathDifficulty.hard,
+          );
+          final Set<MathOperator> seen = <MathOperator>{
+            for (final MathQuestion q in generateWithSeed(config, seed))
+              q.operator,
+          };
+          expect(seen, MathOperator.values.toSet());
+        }
+      }
+    });
+
+    test('short hard sets use distinct operators', () {
+      for (int seed = 0; seed < 40; seed++) {
+        for (final int count in <int>[1, 2, 3]) {
+          final MathMissionConfig config = MathMissionConfig(
+            questionCount: count,
+            difficulty: MathDifficulty.hard,
+          );
+          final List<MathOperator> ops = <MathOperator>[
+            for (final MathQuestion q in generateWithSeed(config, seed))
+              q.operator,
+          ];
+          expect(ops.toSet(), hasLength(count));
+        }
+      }
     });
   });
 

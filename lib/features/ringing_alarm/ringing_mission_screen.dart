@@ -35,14 +35,19 @@ import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/features/missions/barcode/barcode_mission_widget.dart';
 import 'package:alarmx/features/missions/code_scan/code_scan_mission_widget.dart'
     show ScannerViewBuilder;
+import 'package:alarmx/features/missions/light/light_mission_widget.dart';
+import 'package:alarmx/features/missions/light/light_sensor_gate.dart';
 import 'package:alarmx/features/missions/math/math_mission_widget.dart';
+import 'package:alarmx/features/missions/memory/memory_mission_widget.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/missions/mission_engine.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
 import 'package:alarmx/features/missions/permissions/camera_permission.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
 import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:alarmx/features/missions/photo/photo_mission_widget.dart';
 import 'package:alarmx/features/missions/qr/qr_mission_widget.dart';
+import 'package:alarmx/features/missions/sequence/sequence_mission_widget.dart';
 import 'package:alarmx/features/missions/shake/shake_mission.dart';
 import 'package:alarmx/features/missions/shake/shake_mission_widget.dart';
 import 'package:alarmx/features/missions/typing/typing_mission_widget.dart';
@@ -61,17 +66,25 @@ class MissionTestOverrides {
     this.permissionGate,
     this.scannerBuilder,
     this.photoSource,
+    this.photoFingerprints,
     this.shakeSource,
     this.shakeDetector,
     this.mathRandom,
+    this.memoryRandom,
+    this.sequenceRandom,
+    this.lightGate,
   });
 
   final CameraPermissionGate? permissionGate;
   final ScannerViewBuilder? scannerBuilder;
   final PhotoCaptureSource? photoSource;
+  final FingerprintSource? photoFingerprints;
   final ShakeSensorSource? shakeSource;
   final ShakeDetector? shakeDetector;
   final Random? mathRandom;
+  final Random? memoryRandom;
+  final Random? sequenceRandom;
+  final LightSensorGate? lightGate;
 }
 
 /// Serves [launch]'s ring to a terminal outcome; see the file docs.
@@ -600,6 +613,7 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
           entry: entry,
           onCompleted: complete,
           captureSource: overrides.photoSource,
+          fingerprintSource: overrides.photoFingerprints,
         );
       case MissionType.shake:
         return ShakeMissionWidget(
@@ -615,6 +629,27 @@ class _RingingMissionScreenState extends State<RingingMissionScreen> {
           entry: entry,
           onCompleted: complete,
           random: overrides.mathRandom,
+        );
+      case MissionType.memory:
+        return MemoryMissionWidget(
+          key: ValueKey<int>(entry.id),
+          entry: entry,
+          onCompleted: complete,
+          random: overrides.memoryRandom,
+        );
+      case MissionType.sequence:
+        return SequenceMissionWidget(
+          key: ValueKey<int>(entry.id),
+          entry: entry,
+          onCompleted: complete,
+          random: overrides.sequenceRandom,
+        );
+      case MissionType.light:
+        return LightMissionWidget(
+          key: ValueKey<int>(entry.id),
+          entry: entry,
+          onCompleted: complete,
+          gate: overrides.lightGate,
         );
       case MissionType.none:
         // Unreachable: the service filters `none` rows before the engine.

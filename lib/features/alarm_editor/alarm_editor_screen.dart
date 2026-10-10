@@ -32,6 +32,8 @@ import 'package:alarmx/core/security/pin_service.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/alarm_draft.dart';
 import 'package:alarmx/features/alarm_editor/audio_picker_gate.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
+import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:alarmx/features/alarm_editor/editor_card.dart';
 import 'package:alarmx/features/alarm_editor/mission_section.dart';
 import 'package:alarmx/features/alarm_editor/time_wheel_picker.dart';
@@ -50,6 +52,8 @@ class AlarmEditorScreen extends StatefulWidget {
     required this.pinService,
     required this.settings,
     this.audioPicker = const MethodChannelAudioPicker(),
+    this.photoCaptureSource,
+    this.photoFingerprintSource,
   }) : alarmId = null;
 
   const AlarmEditorScreen.edit({
@@ -60,6 +64,8 @@ class AlarmEditorScreen extends StatefulWidget {
     required this.settings,
     required int this.alarmId,
     this.audioPicker = const MethodChannelAudioPicker(),
+    this.photoCaptureSource,
+    this.photoFingerprintSource,
   });
 
   final AlarmController controller;
@@ -75,6 +81,11 @@ class AlarmEditorScreen extends StatefulWidget {
 
   /// System pickers for custom alarm sounds (injectable for tests).
   final AudioPickerGate audioPicker;
+
+  /// Photo reference-enrollment overrides for tests (null = production
+  /// system camera + real file hashing).
+  final PhotoCaptureSource? photoCaptureSource;
+  final FingerprintSource? photoFingerprintSource;
 
   /// Null for create, the stored id for edit.
   final int? alarmId;
@@ -108,6 +119,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           pinService: widget.pinService,
           settings: widget.settings,
           audioPicker: widget.audioPicker,
+          photoCaptureSource: widget.photoCaptureSource,
+          photoFingerprintSource: widget.photoFingerprintSource,
           existing: null,
         ),
       );
@@ -149,6 +162,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             pinService: widget.pinService,
             settings: widget.settings,
             audioPicker: widget.audioPicker,
+            photoCaptureSource: widget.photoCaptureSource,
+            photoFingerprintSource: widget.photoFingerprintSource,
             existing: alarm,
           ),
         );
@@ -184,6 +199,8 @@ class _EditorForm extends StatefulWidget {
     required this.pinService,
     required this.settings,
     required this.audioPicker,
+    required this.photoCaptureSource,
+    required this.photoFingerprintSource,
     required this.existing,
   });
 
@@ -192,6 +209,8 @@ class _EditorForm extends StatefulWidget {
   final PinService pinService;
   final AppSettingsRepository settings;
   final AudioPickerGate audioPicker;
+  final PhotoCaptureSource? photoCaptureSource;
+  final FingerprintSource? photoFingerprintSource;
   final Alarm? existing;
 
   @override
@@ -670,6 +689,8 @@ class _EditorFormState extends State<_EditorForm> {
                     _draft.strictMode &&
                     !_missionsUnlocked,
                 onUnlock: _unlockMissions,
+                photoCaptureSource: widget.photoCaptureSource,
+                photoFingerprintSource: widget.photoFingerprintSource,
               ),
             ],
           ),

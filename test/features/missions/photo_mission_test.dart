@@ -1,9 +1,13 @@
 // Tests for the photo mission: capture outcomes, cancellation, errors,
-// and the execution widget (all with a scripted capture source).
+// reference matching, and the execution widget (all with scripted
+// capture/fingerprint sources).
+
+import 'dart:async' show Completer;
 
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
 import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:alarmx/features/missions/photo/photo_mission_widget.dart';
 import 'package:flutter/material.dart';
@@ -35,13 +39,44 @@ class ThrowingPhotoSource implements PhotoCaptureSource {
   }
 }
 
-MissionEntry photoEntry([String label = '']) {
+/// Scripted fingerprint source for tests.
+class FakeFingerprintSource implements FingerprintSource {
+  FakeFingerprintSource(this.results);
+
+  final List<int?> results;
+  int calls = 0;
+
+  @override
+  Future<int?> fingerprintOf(String path) async {
+    calls++;
+    if (results.isEmpty) {
+      return null;
+    }
+    return results.removeAt(0);
+  }
+}
+
+/// Fingerprint source blocked on [gate] for verifying-phase tests.
+class GatedFingerprintSource implements FingerprintSource {
+  GatedFingerprintSource(this.gate, this.result);
+
+  final Completer<void> gate;
+  final int? result;
+
+  @override
+  Future<int?> fingerprintOf(String path) async {
+    await gate.future;
+    return result;
+  }
+}
+
+MissionEntry photoEntry([String label = '', int? fingerprint]) {
   return MissionEntry(
     id: 1,
     alarmId: 9,
     type: MissionType.photo,
     orderIndex: 0,
-    config: PhotoMissionConfig(label),
+    config: PhotoMissionConfig(label, fingerprint),
     required: true,
   );
 }
@@ -51,6 +86,7 @@ Future<void> pumpPhoto(
   MissionEntry entry,
   PhotoCaptureSource source, {
   required VoidCallback onCompleted,
+  FingerprintSource? fingerprints,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -63,6 +99,7 @@ Future<void> pumpPhoto(
             entry: entry,
             onCompleted: onCompleted,
             captureSource: source,
+            fingerprintSource: fingerprints,
           ),
         ),
       ),
@@ -144,6 +181,100 @@ void main() {
       addTearDown(controller.dispose);
       await controller.capture();
       expect(controller.phase, PhotoPhase.error);
+    });
+
+    test('legacy config without a reference completes on capture', () async {
+      final FakePhotoSource source = FakePhotoSource(
+        <PhotoCaptureOutcome>[const PhotoCaptured('/shot.jpg')],
+      );
+      final FakeFingerprintSource fingerprints =
+          FakeFingerprintSource(<int?>[0x1234]);
+      final PhotoMissionController controller = PhotoMissionController(
+        label: '',
+        captureSource: source,
+        fingerprintSource: fingerprints,
+      );
+      await controller.capture();
+      expect(controller.isDone, isTrue);
+      expect(fingerprints.calls, 0);
+    });
+
+    test('close-enough capture completes', () async {
+      const int reference = 0x123456789ABCDEF0;
+      final FakePhotoSource source = FakePhotoSource(
+        <PhotoCaptureOutcome>[const PhotoCaptured('/shot.jpg')],
+      );
+      final PhotoMissionController controller = PhotoMissionController(
+        label: '',
+        captureSource: source,
+        expectedFingerprint: reference,
+        // Two flipped bits: well within the threshold.
+        fingerprintSource: FakeFingerprintSource(<int?>[reference ^ 0x3]),
+      );
+      await controller.capture();
+      expect(controller.phase, PhotoPhase.done);
+      expect(controller.isDone, isTrue);
+    });
+
+    test('distant capture mismatches and retries', () async {
+      const int reference = 0x123456789ABCDEF0;
+      final FakePhotoSource source = FakePhotoSource(
+        <PhotoCaptureOutcome>[
+          const PhotoCaptured('/wrong.jpg'),
+          const PhotoCaptured('/right.jpg'),
+        ],
+      );
+      final PhotoMissionController controller = PhotoMissionController(
+        label: '',
+        captureSource: source,
+        expectedFingerprint: reference,
+        fingerprintSource: FakeFingerprintSource(
+          <int?>[reference ^ 0x0FEDCBA987654321, reference],
+        ),
+      );
+      await controller.capture();
+      expect(controller.isDone, isFalse);
+      expect(controller.phase, PhotoPhase.idle);
+      expect(controller.mismatchHint, isTrue);
+      await controller.capture();
+      expect(controller.isDone, isTrue);
+      expect(controller.mismatchHint, isFalse);
+    });
+
+    test('unreadable capture mismatches instead of completing', () async {
+      final FakePhotoSource source = FakePhotoSource(
+        <PhotoCaptureOutcome>[const PhotoCaptured('/shot.jpg')],
+      );
+      final PhotoMissionController controller = PhotoMissionController(
+        label: '',
+        captureSource: source,
+        expectedFingerprint: 0x1234,
+        fingerprintSource: FakeFingerprintSource(<int?>[null]),
+      );
+      await controller.capture();
+      expect(controller.isDone, isFalse);
+      expect(controller.mismatchHint, isTrue);
+    });
+
+    test('concurrent captures collapse during verification', () async {
+      final Completer<void> gate = Completer<void>();
+      final FakePhotoSource source = FakePhotoSource(
+        <PhotoCaptureOutcome>[const PhotoCaptured('/shot.jpg')],
+      );
+      final PhotoMissionController controller = PhotoMissionController(
+        label: '',
+        captureSource: source,
+        expectedFingerprint: 0x1234,
+        fingerprintSource: GatedFingerprintSource(gate, 0x1234),
+      );
+      final Future<void> first = controller.capture();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.phase, PhotoPhase.verifying);
+      await controller.capture();
+      gate.complete();
+      await first;
+      expect(source.calls, 1);
+      expect(controller.isDone, isTrue);
     });
 
     test('capture after done is a no-op', () async {
@@ -235,6 +366,59 @@ void main() {
       expect(find.text(en.photoError), findsOneWidget);
       await tester.tap(find.byKey(const Key('photo_retry_button')));
       await pumpSettle(tester);
+      expect(find.text(en.missionCompleted), findsOneWidget);
+    });
+
+    testWidgets('mismatch shows the hint and allows retry',
+        (WidgetTester tester) async {
+      const int reference = 0x123456789ABCDEF0;
+      int completions = 0;
+      await pumpPhoto(
+        tester,
+        photoEntry('sink', reference),
+        FakePhotoSource(<PhotoCaptureOutcome>[
+          const PhotoCaptured('/wrong.jpg'),
+          const PhotoCaptured('/right.jpg'),
+        ]),
+        onCompleted: () {
+          completions++;
+        },
+        fingerprints: FakeFingerprintSource(
+          <int?>[reference ^ 0x0FEDCBA987654321, reference],
+        ),
+      );
+      await tester.tap(find.byKey(const Key('photo_take_button')));
+      await pumpSettle(tester);
+      expect(find.text(en.photoMismatch), findsOneWidget);
+      expect(completions, 0);
+      await tester.tap(find.byKey(const Key('photo_take_button')));
+      await pumpSettle(tester);
+      expect(completions, 1);
+      expect(find.text(en.missionCompleted), findsOneWidget);
+    });
+
+    testWidgets('verification shows progress until the verdict',
+        (WidgetTester tester) async {
+      final Completer<void> gate = Completer<void>();
+      int completions = 0;
+      await pumpPhoto(
+        tester,
+        photoEntry('', 0x1234),
+        FakePhotoSource(<PhotoCaptureOutcome>[
+          const PhotoCaptured('/p.jpg'),
+        ]),
+        onCompleted: () {
+          completions++;
+        },
+        fingerprints: GatedFingerprintSource(gate, 0x1234),
+      );
+      await tester.tap(find.byKey(const Key('photo_take_button')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text(en.photoVerifying), findsOneWidget);
+      gate.complete();
+      await pumpSettle(tester);
+      expect(completions, 1);
       expect(find.text(en.missionCompleted), findsOneWidget);
     });
 

@@ -66,7 +66,13 @@ class MathQuestion {
 /// division always exact):
 ///   - easy: + and - within 1..20.
 ///   - medium: + and - within 1..100, × within 2..12.
-///   - hard: + and - within 1..200, × within 2..15, exact ÷.
+///   - hard: multi-digit + and - (both operands 10..200), × with a
+///     multi-digit factor (12..25 × 3..12), and exact ÷ with a multi-digit
+///     dividend (divisor 3..12, quotient 12..49). Hard sets also
+///     guarantee operator variety: with 4+ questions every operator
+///     appears at least once; shorter sets use distinct operators.
+///     Shuffling draws from the injected [Random], so seeded tests stay
+///     deterministic.
 class MathQuestionGenerator {
   MathQuestionGenerator(this._random);
 
@@ -74,10 +80,61 @@ class MathQuestionGenerator {
 
   /// Generates exactly [config.questionCount] questions.
   List<MathQuestion> generate(MathMissionConfig config) {
-    return List<MathQuestion>.generate(
-      config.questionCount,
-      (_) => _next(config.difficulty),
-    );
+    if (config.difficulty != MathDifficulty.hard) {
+      return List<MathQuestion>.generate(
+        config.questionCount,
+        (_) => _next(config.difficulty),
+      );
+    }
+    return _generateHard(config.questionCount);
+  }
+
+  /// Hard set with guaranteed operator variety; see the class docs.
+  List<MathQuestion> _generateHard(int count) {
+    final List<MathOperator> operators = <MathOperator>[
+      MathOperator.add,
+      MathOperator.subtract,
+      MathOperator.multiply,
+      MathOperator.divide,
+    ]..shuffle(_random);
+    while (operators.length < count) {
+      operators.add(
+        MathOperator.values[_random.nextInt(MathOperator.values.length)],
+      );
+    }
+    final List<MathOperator> picked =
+        operators.take(count).toList()..shuffle(_random);
+    return <MathQuestion>[
+      for (final MathOperator operator in picked) _nextHard(operator),
+    ];
+  }
+
+  /// One hard question for [operator]; see the class docs for ranges.
+  MathQuestion _nextHard(MathOperator operator) {
+    switch (operator) {
+      case MathOperator.add:
+        return MathQuestion(
+          a: _range(10, 200),
+          b: _range(10, 200),
+          operator: MathOperator.add,
+        );
+      case MathOperator.subtract:
+        return _nonNegativeSubtraction(10, 200);
+      case MathOperator.multiply:
+        return MathQuestion(
+          a: _range(12, 25),
+          b: _range(3, 12),
+          operator: MathOperator.multiply,
+        );
+      case MathOperator.divide:
+        final int divisor = _range(3, 12);
+        final int quotient = _range(12, 49);
+        return MathQuestion(
+          a: divisor * quotient,
+          b: divisor,
+          operator: MathOperator.divide,
+        );
+    }
   }
 
   MathQuestion _next(MathDifficulty difficulty) {
@@ -109,30 +166,9 @@ class MathQuestionGenerator {
           operator: MathOperator.multiply,
         );
       case MathDifficulty.hard:
-        final int pick = _random.nextInt(4);
-        if (pick == 0) {
-          return MathQuestion(
-            a: _range(1, 200),
-            b: _range(1, 200),
-            operator: MathOperator.add,
-          );
-        }
-        if (pick == 1) {
-          return _nonNegativeSubtraction(1, 200);
-        }
-        if (pick == 2) {
-          return MathQuestion(
-            a: _range(2, 15),
-            b: _range(2, 15),
-            operator: MathOperator.multiply,
-          );
-        }
-        final int divisor = _range(2, 12);
-        final int quotient = _range(2, 12);
-        return MathQuestion(
-          a: divisor * quotient,
-          b: divisor,
-          operator: MathOperator.divide,
+        // Unreachable: hard sets go through [_generateHard].
+        return _nextHard(
+          MathOperator.values[_random.nextInt(MathOperator.values.length)],
         );
     }
   }

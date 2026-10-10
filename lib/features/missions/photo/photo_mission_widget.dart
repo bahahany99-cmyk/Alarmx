@@ -1,12 +1,13 @@
-// Photo mission widget (Phase 4): capture a photo to complete.
+// Photo mission widget: capture a photo matching the reference.
 //
 // Renders a [PhotoMissionController]: the instruction with the optional
-// config label, a Take-photo button, a capturing indicator, the
-// cancellation hint, and the error state with a retry. Completion is
-// reported exactly once.
+// config label, a Take-photo button, capturing/verifying indicators, the
+// cancellation and mismatch hints, and the error state with a retry.
+// Completion is reported exactly once.
 
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
 import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:flutter/material.dart';
 
@@ -17,6 +18,7 @@ class PhotoMissionWidget extends StatefulWidget {
     required this.entry,
     required this.onCompleted,
     this.captureSource,
+    this.fingerprintSource,
   });
 
   final MissionEntry entry;
@@ -24,6 +26,9 @@ class PhotoMissionWidget extends StatefulWidget {
 
   /// Capture-source override for tests; production uses the system camera.
   final PhotoCaptureSource? captureSource;
+
+  /// Fingerprint-source override for tests; production hashes real files.
+  final FingerprintSource? fingerprintSource;
 
   @override
   State<PhotoMissionWidget> createState() => _PhotoMissionWidgetState();
@@ -40,6 +45,9 @@ class _PhotoMissionWidgetState extends State<PhotoMissionWidget> {
     _mission = PhotoMissionController(
       label: raw is PhotoMissionConfig ? raw.label.trim() : '',
       captureSource: widget.captureSource ?? ImagePickerPhotoSource(),
+      expectedFingerprint:
+          raw is PhotoMissionConfig ? raw.fingerprint : null,
+      fingerprintSource: widget.fingerprintSource,
     );
     _mission.addListener(_onProgress);
   }
@@ -94,6 +102,16 @@ class _PhotoMissionWidgetState extends State<PhotoMissionWidget> {
                     textAlign: TextAlign.center,
                   ),
                 ],
+                if (_mission.mismatchHint) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    strings.photoMismatch,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   key: const Key('photo_take_button'),
@@ -108,6 +126,24 @@ class _PhotoMissionWidgetState extends State<PhotoMissionWidget> {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: CircularProgressIndicator(),
+              ),
+            );
+          case PhotoPhase.verifying:
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(
+                      strings.photoVerifying,
+                      style: theme.textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             );
           case PhotoPhase.done:

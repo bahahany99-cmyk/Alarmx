@@ -70,6 +70,83 @@ void main() {
       expect(mathParsed.difficulty, MathDifficulty.hard);
     });
 
+    test('photo fingerprint round-trips; legacy rows lack it', () {
+      const PhotoMissionConfig config = PhotoMissionConfig('sink', 0x1234);
+      final MissionConfig? parsed = parseMissionConfig(
+        MissionType.photo,
+        encodeMissionConfig(config),
+      );
+      final PhotoMissionConfig photo = parsed! as PhotoMissionConfig;
+      expect(photo.label, 'sink');
+      expect(photo.fingerprint, 0x1234);
+      final MissionConfig? legacy = parseMissionConfig(
+        MissionType.photo,
+        '{"label": "sink"}',
+      );
+      expect((legacy! as PhotoMissionConfig).fingerprint, isNull);
+      expect(
+        parseMissionConfig(MissionType.photo, '{"fingerprint": "x"}'),
+        isNull,
+      );
+      expect(
+        parseMissionConfig(
+          MissionType.photo,
+          '{"label": "sink", "fingerprint": 99}',
+        ),
+        isA<PhotoMissionConfig>(),
+      );
+    });
+
+    test('memory, sequence and light round-trips', () {
+      const MemoryMissionConfig memory =
+          MemoryMissionConfig(difficulty: MemoryDifficulty.hard);
+      final MissionConfig? parsedMemory = parseMissionConfig(
+        MissionType.memory,
+        encodeMissionConfig(memory),
+      );
+      expect(
+        (parsedMemory! as MemoryMissionConfig).difficulty,
+        MemoryDifficulty.hard,
+      );
+      const SequenceMissionConfig sequence =
+          SequenceMissionConfig(difficulty: SequenceDifficulty.medium);
+      final MissionConfig? parsedSequence = parseMissionConfig(
+        MissionType.sequence,
+        encodeMissionConfig(sequence),
+      );
+      expect(
+        (parsedSequence! as SequenceMissionConfig).difficulty,
+        SequenceDifficulty.medium,
+      );
+      const LightMissionConfig light =
+          LightMissionConfig(mode: LightMode.glowDot);
+      final MissionConfig? parsedLight = parseMissionConfig(
+        MissionType.light,
+        encodeMissionConfig(light),
+      );
+      expect((parsedLight! as LightMissionConfig).mode, LightMode.glowDot);
+    });
+
+    test('unknown difficulty and mode values are invalid', () {
+      expect(
+        parseMissionConfig(MissionType.memory, '{"difficulty": "insane"}'),
+        isNull,
+      );
+      expect(
+        parseMissionConfig(MissionType.memory, '{"difficulty": 42}'),
+        isNull,
+      );
+      expect(
+        parseMissionConfig(MissionType.sequence, '{"difficulty": "easy!"}'),
+        isNull,
+      );
+      expect(
+        parseMissionConfig(MissionType.light, '{"mode": "bright"}'),
+        isNull,
+      );
+      expect(parseMissionConfig(MissionType.light, '{"mode": null}'), isNull);
+    });
+
     test('unknown fields are ignored', () {
       final MissionConfig? parsed = parseMissionConfig(
         MissionType.typing,

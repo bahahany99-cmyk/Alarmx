@@ -4,6 +4,8 @@ import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
 import 'package:alarmx/features/missions/mission_service.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
+import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +15,31 @@ import '../../support/test_doubles.dart';
 // Mission section tests: real in-memory stack, real MissionService. The
 // form is pumped in a tall viewport so every row builds without
 // scrolling; dialogs are driven by key so the tests work in any locale.
+
+/// Scripted reference-capture source for enrollment tests.
+class FakeReferenceCapture implements PhotoCaptureSource {
+  FakeReferenceCapture(this.outcome);
+
+  final PhotoCaptureOutcome outcome;
+
+  @override
+  Future<PhotoCaptureOutcome> capturePhoto() async => outcome;
+}
+
+/// Scripted fingerprint source for enrollment tests.
+class FakeReferencePrints implements FingerprintSource {
+  FakeReferencePrints(this.results);
+
+  final List<int?> results;
+
+  @override
+  Future<int?> fingerprintOf(String path) async {
+    if (results.isEmpty) {
+      return null;
+    }
+    return results.removeAt(0);
+  }
+}
 
 void main() {
   late TestStack stack;
@@ -31,11 +58,20 @@ void main() {
     WidgetTester tester, {
     String language = AppLanguage.english,
     int? alarmId,
+    PhotoCaptureSource? photoCaptureSource,
+    FingerprintSource? photoFingerprintSource,
   }) async {
     tester.view.physicalSize = const Size(800, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await pumpEditor(tester, stack, language: language, alarmId: alarmId);
+    await pumpEditor(
+      tester,
+      stack,
+      language: language,
+      alarmId: alarmId,
+      photoCaptureSource: photoCaptureSource,
+      photoFingerprintSource: photoFingerprintSource,
+    );
   }
 
   Future<List<MissionEntry>> entriesFor(int alarmId) async {
@@ -149,9 +185,27 @@ void main() {
 
     testWidgets('photo mission allows a blank label',
         (WidgetTester tester) async {
-      await pumpTallEditor(tester);
+      await pumpTallEditor(
+        tester,
+        photoCaptureSource:
+            FakeReferenceCapture(const PhotoCaptured('/ref.jpg')),
+        photoFingerprintSource:
+            FakeReferencePrints(<int?>[0x123456789ABCDEF0]),
+      );
 
-      await addMission(tester, MissionType.photo);
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.photo.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(const Key('mission_config_capture_reference')),
+      );
+      await pumpSettle(tester);
+      expect(find.text(en.photoReferenceDone), findsOneWidget);
+      await tester.tap(find.byKey(const Key('mission_config_save')));
+      await pumpSettle(tester);
       expect(find.text('1. ${en.missionPhoto}'), findsOneWidget);
 
       await saveAlarm(tester);
@@ -161,7 +215,149 @@ void main() {
       final List<MissionEntry> entries = await entriesFor(alarms.single.id);
       expect(entries, hasLength(1));
       expect(entries.single.type, MissionType.photo);
-      expect((entries.single.config as PhotoMissionConfig).label, '');
+      final PhotoMissionConfig photo =
+          entries.single.config as PhotoMissionConfig;
+      expect(photo.label, '');
+      expect(photo.fingerprint, 0x123456789ABCDEF0);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('photo mission without a reference is rejected in the dialog',
+        (WidgetTester tester) async {
+      await pumpTallEditor(tester);
+
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.photo.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('mission_config_save')));
+      await pumpSettle(tester);
+
+      expect(find.text(en.photoReferenceRequired), findsWidgets);
+      expect(find.byKey(const Key('mission_config_save')), findsOneWidget);
+      expect(find.byKey(const Key('mission_row_0')), findsNothing);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('degenerate reference photo is rejected',
+        (WidgetTester tester) async {
+      await pumpTallEditor(
+        tester,
+        photoCaptureSource:
+            FakeReferenceCapture(const PhotoCaptured('/blank.jpg')),
+        photoFingerprintSource: FakeReferencePrints(<int?>[0]),
+      );
+
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.photo.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(const Key('mission_config_capture_reference')),
+      );
+      await pumpSettle(tester);
+
+      expect(find.text(en.photoReferenceWeak), findsOneWidget);
+      expect(find.text(en.photoReferenceDone), findsNothing);
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('memory mission is configured and saved with the alarm',
+        (WidgetTester tester) async {
+      await pumpTallEditor(tester);
+
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.memory.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(const Key('mission_config_memory_difficulty')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.text(en.memoryHard));
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('mission_config_save')));
+      await pumpSettle(tester);
+      expect(find.text('1. ${en.missionMemory}'), findsOneWidget);
+      expect(find.text(en.memoryHard), findsOneWidget);
+
+      await saveAlarm(tester);
+
+      final List<Alarm> alarms = await stack.repository.getAlarms();
+      final List<MissionEntry> entries = await entriesFor(alarms.single.id);
+      expect(entries.single.type, MissionType.memory);
+      expect(
+        (entries.single.config as MemoryMissionConfig).difficulty,
+        MemoryDifficulty.hard,
+      );
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('sequence mission is configured and saved with the alarm',
+        (WidgetTester tester) async {
+      await pumpTallEditor(tester);
+
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.sequence.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(const Key('mission_config_sequence_difficulty')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.text(en.sequenceMedium));
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('mission_config_save')));
+      await pumpSettle(tester);
+      expect(find.text('1. ${en.missionSequence}'), findsOneWidget);
+
+      await saveAlarm(tester);
+
+      final List<Alarm> alarms = await stack.repository.getAlarms();
+      final List<MissionEntry> entries = await entriesFor(alarms.single.id);
+      expect(entries.single.type, MissionType.sequence);
+      expect(
+        (entries.single.config as SequenceMissionConfig).difficulty,
+        SequenceDifficulty.medium,
+      );
+      await finishWidgetTest(tester, stack);
+    });
+
+    testWidgets('light mission is configured and saved with the alarm',
+        (WidgetTester tester) async {
+      await pumpTallEditor(tester);
+
+      await tester.tap(find.byKey(const Key('mission_add_button')));
+      await pumpSettle(tester);
+      await tester.tap(
+        find.byKey(Key('mission_type_option_${MissionType.light.name}')),
+      );
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('mission_config_light_mode')));
+      await pumpSettle(tester);
+      await tester.tap(find.text(en.lightModeGlow));
+      await pumpSettle(tester);
+      await tester.tap(find.byKey(const Key('mission_config_save')));
+      await pumpSettle(tester);
+      expect(find.text('1. ${en.missionLight}'), findsOneWidget);
+
+      await saveAlarm(tester);
+
+      final List<Alarm> alarms = await stack.repository.getAlarms();
+      final List<MissionEntry> entries = await entriesFor(alarms.single.id);
+      expect(entries.single.type, MissionType.light);
+      expect(
+        (entries.single.config as LightMissionConfig).mode,
+        LightMode.glowDot,
+      );
       await finishWidgetTest(tester, stack);
     });
 

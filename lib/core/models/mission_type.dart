@@ -29,7 +29,16 @@ enum MissionType {
   typing('typing'),
 
   /// Shake the phone to dismiss.
-  shake('shake');
+  shake('shake'),
+
+  /// Match all pairs in a memory card grid to dismiss.
+  memory('memory'),
+
+  /// Tap shuffled number tiles in the prompted order to dismiss.
+  sequence('sequence'),
+
+  /// Catch bright light (or guide the glow dot) to dismiss.
+  light('light');
 
   const MissionType(this.dbValue);
 

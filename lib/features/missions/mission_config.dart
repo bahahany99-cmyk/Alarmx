@@ -116,16 +116,22 @@ class TypingMissionConfig extends MissionConfig {
   }
 }
 
-/// Photo mission: capture a photo with the system camera to dismiss.
+/// Photo mission: capture a photo matching the enrolled reference.
 ///
-/// Phase 4 validates capture completion, not image similarity: local
-/// computer-vision matching is explicitly deferred to the later V1.1/V2
-/// enhancement. [label] is an optional free-text hint shown to the user
-/// (e.g. what to photograph); it is never used for matching.
+/// The editor enrolls a reference fingerprint (a 64-bit perceptual hash
+/// of a reference capture); execution captures and compares, completing
+/// only on a match. [label] is an optional free-text hint shown to the
+/// user (e.g. what to photograph); it is never used for matching.
+/// [fingerprint] is null only for legacy rows enrolled before matching
+/// existed: those complete on any capture (capture-completion fallback)
+/// so old alarms never brick.
 class PhotoMissionConfig extends MissionConfig {
-  const PhotoMissionConfig([this.label = '']);
+  const PhotoMissionConfig([this.label = '', this.fingerprint]);
 
   final String label;
+
+  /// Enrolled reference fingerprint, or null for legacy rows.
+  final int? fingerprint;
 
   @override
   MissionType get type => MissionType.photo;
@@ -133,6 +139,7 @@ class PhotoMissionConfig extends MissionConfig {
   @override
   Map<String, Object?> toJson() => <String, Object?>{
         'label': label.trim(),
+        if (fingerprint != null) 'fingerprint': fingerprint,
       };
 
   @override
@@ -247,6 +254,165 @@ class MathMissionConfig extends MissionConfig {
   }
 }
 
+/// Memory mission difficulty, stored as [dbValue] inside the config JSON.
+///
+/// The card counts are part of the contract (shown verbatim in the
+/// editor): easy 12 cards (6 pairs), medium 24 (12 pairs), hard 64
+/// (32 pairs).
+enum MemoryDifficulty {
+  easy('easy'),
+  medium('medium'),
+  hard('hard');
+
+  const MemoryDifficulty(this.dbValue);
+
+  /// Exact string stored in the config JSON.
+  final String dbValue;
+
+  /// Cards dealt at this difficulty (always an even pair count).
+  int get cardCount {
+    switch (this) {
+      case MemoryDifficulty.easy:
+        return 12;
+      case MemoryDifficulty.medium:
+        return 24;
+      case MemoryDifficulty.hard:
+        return 64;
+    }
+  }
+
+  /// Decodes a stored value; unknown values yield `null` (invalid config)
+  /// instead of silently downgrading the mission a user configured.
+  static MemoryDifficulty? fromDbValue(String? value) {
+    for (final MemoryDifficulty difficulty in MemoryDifficulty.values) {
+      if (difficulty.dbValue == value) {
+        return difficulty;
+      }
+    }
+    return null;
+  }
+}
+
+/// Memory mission: match every pair in the card grid.
+class MemoryMissionConfig extends MissionConfig {
+  const MemoryMissionConfig({required this.difficulty});
+
+  final MemoryDifficulty difficulty;
+
+  @override
+  MissionType get type => MissionType.memory;
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'difficulty': difficulty.dbValue,
+      };
+
+  @override
+  String? validationMessageKey() => null;
+}
+
+/// Sequence mission difficulty, stored as [dbValue] inside the config
+/// JSON. Each difficulty deals a fixed tile count (shown verbatim in
+/// the editor): easy 5, medium 7, hard 9.
+enum SequenceDifficulty {
+  easy('easy'),
+  medium('medium'),
+  hard('hard');
+
+  const SequenceDifficulty(this.dbValue);
+
+  /// Exact string stored in the config JSON.
+  final String dbValue;
+
+  /// Tiles dealt at this difficulty.
+  int get tileCount {
+    switch (this) {
+      case SequenceDifficulty.easy:
+        return 5;
+      case SequenceDifficulty.medium:
+        return 7;
+      case SequenceDifficulty.hard:
+        return 9;
+    }
+  }
+
+  /// Decodes a stored value; unknown values yield `null` (invalid config)
+  /// instead of silently downgrading the mission a user configured.
+  static SequenceDifficulty? fromDbValue(String? value) {
+    for (final SequenceDifficulty difficulty in SequenceDifficulty.values) {
+      if (difficulty.dbValue == value) {
+        return difficulty;
+      }
+    }
+    return null;
+  }
+}
+
+/// Sequence mission: tap shuffled number tiles in the prompted order
+/// (ascending or descending, decided fresh at each execution).
+class SequenceMissionConfig extends MissionConfig {
+  const SequenceMissionConfig({required this.difficulty});
+
+  final SequenceDifficulty difficulty;
+
+  @override
+  MissionType get type => MissionType.sequence;
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'difficulty': difficulty.dbValue,
+      };
+
+  @override
+  String? validationMessageKey() => null;
+}
+
+/// Light mission mode, stored as [dbValue] inside the config JSON.
+enum LightMode {
+  /// Catch bright light with the ambient-light sensor.
+  lightCatch('catch'),
+
+  /// Drag the glowing dot into the ring (no sensor needed).
+  glowDot('glow');
+
+
+  const LightMode(this.dbValue);
+
+  /// Exact string stored in the config JSON.
+  final String dbValue;
+
+  /// Decodes a stored value; unknown values yield `null` (invalid config)
+  /// instead of silently switching the mission a user configured.
+  static LightMode? fromDbValue(String? value) {
+    for (final LightMode mode in LightMode.values) {
+      if (mode.dbValue == value) {
+        return mode;
+      }
+    }
+    return null;
+  }
+}
+
+/// Light mission: [LightMode.lightCatch] completes when the ambient-light
+/// sensor reads bright light; [LightMode.glowDot] by dragging the
+/// glowing dot into the ring.
+class LightMissionConfig extends MissionConfig {
+  const LightMissionConfig({required this.mode});
+
+  final LightMode mode;
+
+  @override
+  MissionType get type => MissionType.light;
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'mode': mode.dbValue,
+      };
+
+  @override
+  String? validationMessageKey() => null;
+}
+
 /// Parses [configJson] into the config for [type], or `null` when the
 /// stored value is missing/malformed. Never throws: unknown JSON fields
 /// are ignored, and every structural problem (bad JSON, wrong shape,
@@ -280,10 +446,17 @@ MissionConfig? parseMissionConfig(MissionType type, String? configJson) {
       return text is String ? TypingMissionConfig(text) : null;
     case MissionType.photo:
       final Object? label = decoded['label'];
-      if (label == null) {
+      final Object? fingerprint = decoded['fingerprint'];
+      if (label == null && fingerprint == null) {
         return const PhotoMissionConfig();
       }
-      return label is String ? PhotoMissionConfig(label) : null;
+      if (label is! String) {
+        return null;
+      }
+      if (fingerprint != null && fingerprint is! int) {
+        return null;
+      }
+      return PhotoMissionConfig(label, fingerprint as int?);
     case MissionType.qr:
       final Object? value = decoded['value'];
       return value is String ? QrMissionConfig(value) : null;
@@ -305,6 +478,29 @@ MissionConfig? parseMissionConfig(MissionType type, String? configJson) {
         questionCount: count,
         difficulty: parsedDifficulty,
       );
+    case MissionType.memory:
+      final Object? memoryDifficulty = decoded['difficulty'];
+      final MemoryDifficulty? parsedMemory = memoryDifficulty is String
+          ? MemoryDifficulty.fromDbValue(memoryDifficulty)
+          : null;
+      return parsedMemory == null
+          ? null
+          : MemoryMissionConfig(difficulty: parsedMemory);
+    case MissionType.sequence:
+      final Object? sequenceDifficulty = decoded['difficulty'];
+      final SequenceDifficulty? parsedSequence = sequenceDifficulty is String
+          ? SequenceDifficulty.fromDbValue(sequenceDifficulty)
+          : null;
+      return parsedSequence == null
+          ? null
+          : SequenceMissionConfig(difficulty: parsedSequence);
+    case MissionType.light:
+      final Object? mode = decoded['mode'];
+      final LightMode? parsedMode =
+          mode is String ? LightMode.fromDbValue(mode) : null;
+      return parsedMode == null
+          ? null
+          : LightMissionConfig(mode: parsedMode);
   }
 }
 
@@ -376,6 +572,14 @@ class MissionDraft {
           questionCount: 5,
           difficulty: MathDifficulty.easy,
         );
+      case MissionType.memory:
+        return const MemoryMissionConfig(difficulty: MemoryDifficulty.easy);
+      case MissionType.sequence:
+        return const SequenceMissionConfig(
+          difficulty: SequenceDifficulty.easy,
+        );
+      case MissionType.light:
+        return const LightMissionConfig(mode: LightMode.lightCatch);
     }
   }
 }

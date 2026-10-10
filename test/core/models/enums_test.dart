@@ -32,6 +32,9 @@ void main() {
       expect(MissionType.photo.dbValue, 'photo');
       expect(MissionType.typing.dbValue, 'typing');
       expect(MissionType.shake.dbValue, 'shake');
+      expect(MissionType.memory.dbValue, 'memory');
+      expect(MissionType.sequence.dbValue, 'sequence');
+      expect(MissionType.light.dbValue, 'light');
     });
 
     test('every value round-trips through the database string', () {

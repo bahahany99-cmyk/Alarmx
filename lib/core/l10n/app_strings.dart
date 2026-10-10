@@ -193,6 +193,40 @@ class AppStrings {
   String get mathEasy => text('mathEasy');
   String get mathMedium => text('mathMedium');
   String get mathHard => text('mathHard');
+  String get missionMemory => text('missionMemory');
+  String get missionSequence => text('missionSequence');
+  String get missionLight => text('missionLight');
+  String get memoryDifficultyLabel => text('memoryDifficultyLabel');
+  String get memoryEasy => text('memoryEasy');
+  String get memoryMedium => text('memoryMedium');
+  String get memoryHard => text('memoryHard');
+  String get memoryInstruction => text('memoryInstruction');
+  String get memoryMoves => text('memoryMoves');
+  String get memoryPairs => text('memoryPairs');
+  String get sequenceDifficultyLabel => text('sequenceDifficultyLabel');
+  String get sequenceEasy => text('sequenceEasy');
+  String get sequenceMedium => text('sequenceMedium');
+  String get sequenceHard => text('sequenceHard');
+  String get sequencePromptAsc => text('sequencePromptAsc');
+  String get sequencePromptDesc => text('sequencePromptDesc');
+  String get sequenceWrong => text('sequenceWrong');
+  String get sequenceProgress => text('sequenceProgress');
+  String get lightModeLabel => text('lightModeLabel');
+  String get lightModeCatch => text('lightModeCatch');
+  String get lightModeGlow => text('lightModeGlow');
+  String get lightCatchInstruction => text('lightCatchInstruction');
+  String get lightLux => text('lightLux');
+  String get lightNoSensor => text('lightNoSensor');
+  String get lightUseGlowInstead => text('lightUseGlowInstead');
+  String get lightGlowInstruction => text('lightGlowInstruction');
+  String get photoReferenceTitle => text('photoReferenceTitle');
+  String get photoCaptureReference => text('photoCaptureReference');
+  String get photoRetakeReference => text('photoRetakeReference');
+  String get photoReferenceDone => text('photoReferenceDone');
+  String get photoReferenceRequired => text('photoReferenceRequired');
+  String get photoReferenceWeak => text('photoReferenceWeak');
+  String get photoMismatch => text('photoMismatch');
+  String get photoVerifying => text('photoVerifying');
   String get permissionCameraTitle => text('permissionCameraTitle');
   String get permissionCameraMessage => text('permissionCameraMessage');
   String get permissionAllow => text('permissionAllow');
@@ -469,6 +503,40 @@ class AppStrings {
     'mathEasy': 'سهلة',
     'mathMedium': 'متوسطة',
     'mathHard': 'صعبة',
+    'missionMemory': 'لعبة الذاكرة',
+    'missionSequence': 'تسلسل الأرقام',
+    'missionLight': 'تحدي الضوء',
+    'memoryDifficultyLabel': 'الصعوبة (البطاقات)',
+    'memoryEasy': 'سهل (12 بطاقة)',
+    'memoryMedium': 'متوسط (24 بطاقة)',
+    'memoryHard': 'صعب (64 بطاقة)',
+    'memoryInstruction': 'طابق كل الأزواج',
+    'memoryMoves': 'المحاولات',
+    'memoryPairs': 'الأزواج',
+    'sequenceDifficultyLabel': 'الصعوبة (المربعات)',
+    'sequenceEasy': 'سهل (5 مربعات)',
+    'sequenceMedium': 'متوسط (7 مربعات)',
+    'sequenceHard': 'صعب (9 مربعات)',
+    'sequencePromptAsc': 'اضغط الأرقام بالترتيب التصاعدي',
+    'sequencePromptDesc': 'اضغط الأرقام بالترتيب التنازلي',
+    'sequenceWrong': 'مربع خاطئ - ابدأ من جديد',
+    'sequenceProgress': 'التقدم',
+    'lightModeLabel': 'وضع التحدي',
+    'lightModeCatch': 'اصطياد الضوء',
+    'lightModeGlow': 'النقطة المضيئة',
+    'lightCatchInstruction': 'وجه الهاتف نحو ضوء ساطع',
+    'lightLux': 'مستوى الإضاءة',
+    'lightNoSensor': 'لا يوجد مستشعر إضاءة في هذا الجهاز',
+    'lightUseGlowInstead': 'العب النقطة المضيئة بدلا من ذلك',
+    'lightGlowInstruction': 'اسحب النقطة المضيئة إلى داخل الحلقة',
+    'photoReferenceTitle': 'الصورة المرجعية',
+    'photoCaptureReference': 'التقاط المرجع',
+    'photoRetakeReference': 'إعادة الالتقاط',
+    'photoReferenceDone': 'تم التقاط المرجع',
+    'photoReferenceRequired': 'التقط صورة مرجعية أولا',
+    'photoReferenceWeak': 'المرجع باهت - التقط شيئا مفصلا',
+    'photoMismatch': 'لا تطابق الصورة المرجعية - حاول مجددا',
+    'photoVerifying': 'جار الفحص...',
     'permissionCameraTitle': 'يلزم إذن الكاميرا',
     'permissionCameraMessage': 'اسمح بالوصول إلى الكاميرا لإتمام هذه المهمة',
     'permissionAllow': 'سماح',
@@ -743,6 +811,40 @@ class AppStrings {
     'mathEasy': 'Easy',
     'mathMedium': 'Medium',
     'mathHard': 'Hard',
+    'missionMemory': 'Memory Match',
+    'missionSequence': 'Number Sequence',
+    'missionLight': 'Light Challenge',
+    'memoryDifficultyLabel': 'Difficulty (cards)',
+    'memoryEasy': 'Easy (12 cards)',
+    'memoryMedium': 'Medium (24 cards)',
+    'memoryHard': 'Hard (64 cards)',
+    'memoryInstruction': 'Match all pairs',
+    'memoryMoves': 'Moves',
+    'memoryPairs': 'Pairs',
+    'sequenceDifficultyLabel': 'Difficulty (tiles)',
+    'sequenceEasy': 'Easy (5 tiles)',
+    'sequenceMedium': 'Medium (7 tiles)',
+    'sequenceHard': 'Hard (9 tiles)',
+    'sequencePromptAsc': 'Tap the numbers in ascending order',
+    'sequencePromptDesc': 'Tap the numbers in descending order',
+    'sequenceWrong': 'Wrong tile - start over',
+    'sequenceProgress': 'Progress',
+    'lightModeLabel': 'Challenge mode',
+    'lightModeCatch': 'Light Catch',
+    'lightModeGlow': 'Glow Dot',
+    'lightCatchInstruction': 'Point the phone at a bright light',
+    'lightLux': 'Light level',
+    'lightNoSensor': 'No light sensor found on this device',
+    'lightUseGlowInstead': 'Play Glow Dot instead',
+    'lightGlowInstruction': 'Drag the glowing dot into the ring',
+    'photoReferenceTitle': 'Reference photo',
+    'photoCaptureReference': 'Capture reference',
+    'photoRetakeReference': 'Retake',
+    'photoReferenceDone': 'Reference captured',
+    'photoReferenceRequired': 'Capture a reference photo first',
+    'photoReferenceWeak': 'Reference too plain - capture something detailed',
+    'photoMismatch': 'Does not match the reference - try again',
+    'photoVerifying': 'Checking...',
     'permissionCameraTitle': 'Camera permission needed',
     'permissionCameraMessage': 'Allow camera access to complete this mission',
     'permissionAllow': 'Allow',

@@ -22,6 +22,8 @@ import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/alarm_editor/editor_card.dart';
 import 'package:alarmx/features/missions/mission_config.dart';
+import 'package:alarmx/features/missions/photo/photo_fingerprint.dart';
+import 'package:alarmx/features/missions/photo/photo_mission.dart';
 import 'package:flutter/material.dart';
 
 /// Mission types the editor can add, in roadmap order (typing, photo,
@@ -34,6 +36,9 @@ const List<MissionType> kMissionTypeOptions = <MissionType>[
   MissionType.barcode,
   MissionType.shake,
   MissionType.math,
+  MissionType.memory,
+  MissionType.sequence,
+  MissionType.light,
 ];
 
 /// Friendly display name for [type].
@@ -51,6 +56,12 @@ String missionTypeName(AppStrings strings, MissionType type) {
       return strings.missionShake;
     case MissionType.math:
       return strings.missionMath;
+    case MissionType.memory:
+      return strings.missionMemory;
+    case MissionType.sequence:
+      return strings.missionSequence;
+    case MissionType.light:
+      return strings.missionLight;
     case MissionType.none:
       return strings.missionNone;
   }
@@ -65,6 +76,43 @@ String mathDifficultyName(AppStrings strings, MathDifficulty difficulty) {
       return strings.mathMedium;
     case MathDifficulty.hard:
       return strings.mathHard;
+  }
+}
+
+/// Friendly name for a memory [difficulty] (card counts are explicit).
+String memoryDifficultyName(AppStrings strings, MemoryDifficulty difficulty) {
+  switch (difficulty) {
+    case MemoryDifficulty.easy:
+      return strings.memoryEasy;
+    case MemoryDifficulty.medium:
+      return strings.memoryMedium;
+    case MemoryDifficulty.hard:
+      return strings.memoryHard;
+  }
+}
+
+/// Friendly name for a sequence [difficulty] (tile counts are explicit).
+String sequenceDifficultyName(
+  AppStrings strings,
+  SequenceDifficulty difficulty,
+) {
+  switch (difficulty) {
+    case SequenceDifficulty.easy:
+      return strings.sequenceEasy;
+    case SequenceDifficulty.medium:
+      return strings.sequenceMedium;
+    case SequenceDifficulty.hard:
+      return strings.sequenceHard;
+  }
+}
+
+/// Friendly name for a light [mode].
+String lightModeName(AppStrings strings, LightMode mode) {
+  switch (mode) {
+    case LightMode.lightCatch:
+      return strings.lightModeCatch;
+    case LightMode.glowDot:
+      return strings.lightModeGlow;
   }
 }
 
@@ -91,6 +139,15 @@ String missionDraftSummary(AppStrings strings, MissionDraft draft) {
     return '${mathDifficultyName(strings, config.difficulty)} \u00b7 '
         '${config.questionCount}';
   }
+  if (config is MemoryMissionConfig) {
+    return memoryDifficultyName(strings, config.difficulty);
+  }
+  if (config is SequenceMissionConfig) {
+    return sequenceDifficultyName(strings, config.difficulty);
+  }
+  if (config is LightMissionConfig) {
+    return lightModeName(strings, config.mode);
+  }
   return '\u2014';
 }
 
@@ -115,6 +172,12 @@ IconData _iconFor(MissionType type) {
       return Icons.vibration;
     case MissionType.math:
       return Icons.calculate;
+    case MissionType.memory:
+      return Icons.grid_view;
+    case MissionType.sequence:
+      return Icons.format_list_numbered;
+    case MissionType.light:
+      return Icons.lightbulb_outline;
     case MissionType.none:
       return Icons.emoji_events_outlined;
   }
@@ -132,6 +195,8 @@ class MissionSectionCard extends StatelessWidget {
     required this.onRetryLoad,
     this.locked = false,
     this.onUnlock,
+    this.photoCaptureSource,
+    this.photoFingerprintSource,
   });
 
   /// Live draft list, mutated in place (add/edit/delete/reorder/toggle).
@@ -159,6 +224,11 @@ class MissionSectionCard extends StatelessWidget {
   /// PIN-unlock entry point; called by the unlock button when [locked].
   final VoidCallback? onUnlock;
 
+  /// Reference-enrollment overrides for tests; production captures with
+  /// the system camera and hashes real files.
+  final PhotoCaptureSource? photoCaptureSource;
+  final FingerprintSource? photoFingerprintSource;
+
   Future<void> _add(BuildContext context) async {
     final MissionType? type = await showMissionTypePicker(context);
     if (type == null || !context.mounted) {
@@ -168,6 +238,8 @@ class MissionSectionCard extends StatelessWidget {
       context,
       MissionDraft.withDefaults(type),
       isNew: true,
+      photoCaptureSource: photoCaptureSource,
+      photoFingerprintSource: photoFingerprintSource,
     );
     if (created != null) {
       drafts.add(created);
@@ -183,6 +255,8 @@ class MissionSectionCard extends StatelessWidget {
       context,
       drafts[index].copy(),
       isNew: false,
+      photoCaptureSource: photoCaptureSource,
+      photoFingerprintSource: photoFingerprintSource,
     );
     if (edited != null) {
       drafts[index] = edited;
@@ -485,18 +559,32 @@ Future<MissionDraft?> showMissionConfigDialog(
   BuildContext context,
   MissionDraft draft, {
   required bool isNew,
+  PhotoCaptureSource? photoCaptureSource,
+  FingerprintSource? photoFingerprintSource,
 }) {
   return showDialog<MissionDraft>(
     context: context,
-    builder: (_) => _MissionConfigDialog(draft: draft, isNew: isNew),
+    builder: (_) => _MissionConfigDialog(
+      draft: draft,
+      isNew: isNew,
+      photoCaptureSource: photoCaptureSource,
+      photoFingerprintSource: photoFingerprintSource,
+    ),
   );
 }
 
 class _MissionConfigDialog extends StatefulWidget {
-  const _MissionConfigDialog({required this.draft, required this.isNew});
+  const _MissionConfigDialog({
+    required this.draft,
+    required this.isNew,
+    required this.photoCaptureSource,
+    required this.photoFingerprintSource,
+  });
 
   final MissionDraft draft;
   final bool isNew;
+  final PhotoCaptureSource? photoCaptureSource;
+  final FingerprintSource? photoFingerprintSource;
 
   @override
   State<_MissionConfigDialog> createState() => _MissionConfigDialogState();
@@ -507,6 +595,14 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
       TextEditingController(text: _initialText(widget.draft.config));
   late int _count = _initialCount(widget.draft.config);
   late MathDifficulty _difficulty = _initialDifficulty(widget.draft.config);
+  late MemoryDifficulty _memoryDifficulty =
+      _initialMemoryDifficulty(widget.draft.config);
+  late SequenceDifficulty _sequenceDifficulty =
+      _initialSequenceDifficulty(widget.draft.config);
+  late LightMode _lightMode = _initialLightMode(widget.draft.config);
+  late int? _referenceFingerprint =
+      _initialFingerprint(widget.draft.config);
+  bool _capturingReference = false;
   late bool _required = widget.draft.required;
   String? _errorKey;
 
@@ -543,6 +639,34 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
     return MathDifficulty.easy;
   }
 
+  static MemoryDifficulty _initialMemoryDifficulty(MissionConfig config) {
+    if (config is MemoryMissionConfig) {
+      return config.difficulty;
+    }
+    return MemoryDifficulty.easy;
+  }
+
+  static SequenceDifficulty _initialSequenceDifficulty(MissionConfig config) {
+    if (config is SequenceMissionConfig) {
+      return config.difficulty;
+    }
+    return SequenceDifficulty.easy;
+  }
+
+  static LightMode _initialLightMode(MissionConfig config) {
+    if (config is LightMissionConfig) {
+      return config.mode;
+    }
+    return LightMode.lightCatch;
+  }
+
+  static int? _initialFingerprint(MissionConfig config) {
+    if (config is PhotoMissionConfig) {
+      return config.fingerprint;
+    }
+    return null;
+  }
+
   @override
   void dispose() {
     _textController.dispose();
@@ -554,7 +678,10 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
       case MissionType.typing:
         return TypingMissionConfig(_textController.text);
       case MissionType.photo:
-        return PhotoMissionConfig(_textController.text);
+        return PhotoMissionConfig(
+          _textController.text,
+          _referenceFingerprint,
+        );
       case MissionType.qr:
         return QrMissionConfig(_textController.text);
       case MissionType.barcode:
@@ -566,10 +693,75 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
           questionCount: _count,
           difficulty: _difficulty,
         );
+      case MissionType.memory:
+        return MemoryMissionConfig(difficulty: _memoryDifficulty);
+      case MissionType.sequence:
+        return SequenceMissionConfig(difficulty: _sequenceDifficulty);
+      case MissionType.light:
+        return LightMissionConfig(mode: _lightMode);
       case MissionType.none:
         // Unreachable: the picker never offers `none`, and validation
         // rejects the inert fallback before anything can be saved.
         return const PhotoMissionConfig();
+    }
+  }
+
+  /// Captures the photo reference and enrolls its fingerprint. A
+  /// cancellation/failure simply leaves the previous fingerprint (if
+  /// any) in place; nothing is ever cleared implicitly.
+  Future<void> _captureReference() async {
+    if (_capturingReference) {
+      return;
+    }
+    setState(() {
+      _capturingReference = true;
+    });
+    final PhotoCaptureSource capture =
+        widget.photoCaptureSource ?? ImagePickerPhotoSource();
+    final FingerprintSource fingerprints =
+        widget.photoFingerprintSource ?? const FileFingerprintSource();
+    final PhotoCaptureOutcome outcome;
+    try {
+      outcome = await capture.capturePhoto();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _capturingReference = false;
+        });
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    switch (outcome) {
+      case PhotoCaptured(:final path):
+        final int? enrolled;
+        try {
+          enrolled = await fingerprints.fingerprintOf(path);
+        } catch (_) {
+          setState(() {
+            _capturingReference = false;
+          });
+          return;
+        }
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _capturingReference = false;
+          if (enrolled != null && !isDegenerateFingerprint(enrolled)) {
+            _referenceFingerprint = enrolled;
+            _errorKey = null;
+          } else if (enrolled != null) {
+            _errorKey = 'photoReferenceWeak';
+          }
+        });
+      case PhotoCaptureCancelled():
+      case PhotoCaptureFailed():
+        setState(() {
+          _capturingReference = false;
+        });
     }
   }
 
@@ -579,6 +771,14 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
     if (errorKey != null || config.type != widget.draft.type) {
       setState(() {
         _errorKey = errorKey ?? 'msgMissionInvalid';
+      });
+      return;
+    }
+    if (config is PhotoMissionConfig && _referenceFingerprint == null) {
+      // Matching needs an enrolled reference; legacy rows keep
+      // capture-completion only until they are next edited.
+      setState(() {
+        _errorKey = 'photoReferenceRequired';
       });
       return;
     }
@@ -655,6 +855,46 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
       case MissionType.photo:
         return <Widget>[
           _textField(strings.photoLabel, kPhotoLabelMaxLength),
+          const SizedBox(height: 12),
+          Text(strings.photoReferenceTitle),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              Icon(
+                _referenceFingerprint != null
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                color: _referenceFingerprint != null
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _referenceFingerprint != null
+                      ? strings.photoReferenceDone
+                      : strings.photoReferenceRequired,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            key: const Key('mission_config_capture_reference'),
+            onPressed: _capturingReference ? null : _captureReference,
+            icon: _capturingReference
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.photo_camera_outlined),
+            label: Text(
+              _referenceFingerprint != null
+                  ? strings.photoRetakeReference
+                  : strings.photoCaptureReference,
+            ),
+          ),
         ];
       case MissionType.qr:
         return <Widget>[
@@ -697,6 +937,75 @@ class _MissionConfigDialogState extends State<_MissionConfigDialog> {
           const SizedBox(height: 8),
           _countChips(
             <int>{...kMathCountOptions, _count}.toList()..sort(),
+          ),
+        ];
+      case MissionType.memory:
+        return <Widget>[
+          Text(strings.memoryDifficultyLabel),
+          const SizedBox(height: 8),
+          DropdownButton<MemoryDifficulty>(
+            key: const Key('mission_config_memory_difficulty'),
+            value: _memoryDifficulty,
+            items: <DropdownMenuItem<MemoryDifficulty>>[
+              for (final MemoryDifficulty difficulty
+                  in MemoryDifficulty.values)
+                DropdownMenuItem<MemoryDifficulty>(
+                  value: difficulty,
+                  child: Text(
+                    memoryDifficultyName(strings, difficulty),
+                  ),
+                ),
+            ],
+            onChanged: (MemoryDifficulty? value) {
+              if (value != null) {
+                setState(() => _memoryDifficulty = value);
+              }
+            },
+          ),
+        ];
+      case MissionType.sequence:
+        return <Widget>[
+          Text(strings.sequenceDifficultyLabel),
+          const SizedBox(height: 8),
+          DropdownButton<SequenceDifficulty>(
+            key: const Key('mission_config_sequence_difficulty'),
+            value: _sequenceDifficulty,
+            items: <DropdownMenuItem<SequenceDifficulty>>[
+              for (final SequenceDifficulty difficulty
+                  in SequenceDifficulty.values)
+                DropdownMenuItem<SequenceDifficulty>(
+                  value: difficulty,
+                  child: Text(
+                    sequenceDifficultyName(strings, difficulty),
+                  ),
+                ),
+            ],
+            onChanged: (SequenceDifficulty? value) {
+              if (value != null) {
+                setState(() => _sequenceDifficulty = value);
+              }
+            },
+          ),
+        ];
+      case MissionType.light:
+        return <Widget>[
+          Text(strings.lightModeLabel),
+          const SizedBox(height: 8),
+          DropdownButton<LightMode>(
+            key: const Key('mission_config_light_mode'),
+            value: _lightMode,
+            items: <DropdownMenuItem<LightMode>>[
+              for (final LightMode mode in LightMode.values)
+                DropdownMenuItem<LightMode>(
+                  value: mode,
+                  child: Text(lightModeName(strings, mode)),
+                ),
+            ],
+            onChanged: (LightMode? value) {
+              if (value != null) {
+                setState(() => _lightMode = value);
+              }
+            },
           ),
         ];
       case MissionType.none:
