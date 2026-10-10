@@ -153,7 +153,13 @@ void main() {
     final FakeNotificationGate gate = FakeNotificationGate(
       NotificationPermissionOutcome.permanentlyDenied,
     );
-    await pumpOnboarding(tester, bridge: bridge, notificationGate: gate);
+    final DateTime now = DateTime(2026, 1, 1);
+    await pumpOnboarding(
+      tester,
+      bridge: bridge,
+      notificationGate: gate,
+      clock: () => now,
+    );
 
     await tapPrimary(tester);
 
@@ -249,7 +255,8 @@ void main() {
     snapshot['batteryExempt'] = false;
     final FakePermissionSystemBridge bridge =
         FakePermissionSystemBridge(snapshot: snapshot);
-    await pumpOnboarding(tester, bridge: bridge);
+    final DateTime now = DateTime(2026, 1, 1);
+    await pumpOnboarding(tester, bridge: bridge, clock: () => now);
 
     await tapContinue(tester);
     expect(find.text(en.onboardingExactTitle), findsOneWidget);
