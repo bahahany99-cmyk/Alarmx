@@ -288,6 +288,9 @@ void main() {
       (WidgetTester tester) async {
     final OnboardingRepository onboarding =
         DriftOnboardingRepository(stack.db);
+    // The shell renders the stored language (Arabic by default); switch to
+    // English like pumpAlarmxApp does before asserting English strings.
+    await stack.setLanguage('en');
     Future<void> pumpShell() {
       return tester.pumpWidget(
         AlarmxApp(
