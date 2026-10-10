@@ -348,7 +348,14 @@ void main() {
     expect(find.text(en.onboardingFullScreenBounceNote), findsOneWidget);
     expect(find.text(en.onboardingSpecialAccessAction), findsOneWidget);
 
-    await tester.tap(find.text(en.onboardingSpecialAccessAction));
+    await tester.scrollUntilVisible(
+      find.text(en.onboardingSpecialAccessAction, skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(
+      find.text(en.onboardingSpecialAccessAction, skipOffstage: false),
+    );
     await pumpSettle(tester);
     expect(
       bridge.opened,
@@ -393,7 +400,14 @@ void main() {
     expect(find.text(en.onboardingAppInfoAction), findsOneWidget);
     expect(find.text(en.onboardingSpecialAccessAction), findsNothing);
 
-    await tester.tap(find.text(en.onboardingAppInfoAction));
+    await tester.scrollUntilVisible(
+      find.text(en.onboardingAppInfoAction, skipOffstage: false),
+      200,
+    );
+    await pumpSettle(tester);
+    await tester.tap(
+      find.text(en.onboardingAppInfoAction, skipOffstage: false),
+    );
     await pumpSettle(tester);
     expect(
       bridge.opened,
