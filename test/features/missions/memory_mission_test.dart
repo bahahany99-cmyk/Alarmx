@@ -17,7 +17,7 @@ import '../../support/test_doubles.dart';
 const MemoryMissionConfig easyConfig =
     MemoryMissionConfig(difficulty: MemoryDifficulty.easy);
 
-MemoryEntry memoryEntry(MemoryMissionConfig config) {
+MissionEntry memoryEntry(MemoryMissionConfig config) {
   return MissionEntry(
     id: 1,
     alarmId: 9,

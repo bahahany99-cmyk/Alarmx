@@ -4,8 +4,6 @@
 // The catch widget samples on a widget-owned periodic timer, so these
 // widget tests pump manually (never settle: the timer never settles).
 
-import 'dart:ui' show Offset;
-
 import 'package:alarmx/core/l10n/app_strings.dart';
 import 'package:alarmx/core/models/models.dart';
 import 'package:alarmx/features/missions/light/light_mission.dart';

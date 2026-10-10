@@ -91,7 +91,7 @@ class _TimeWheelDialogState extends State<_TimeWheelDialog> {
                   Row(
                     children: <Widget>[
                       Expanded(
-                        child: _wheel<int>(
+                        child: _wheel(
                           key: const Key('time_wheel_hour'),
                           controller: _hourController,
                           itemCount: 12,
@@ -106,7 +106,7 @@ class _TimeWheelDialogState extends State<_TimeWheelDialog> {
                         style: theme.textTheme.headlineMedium,
                       ),
                       Expanded(
-                        child: _wheel<int>(
+                        child: _wheel(
                           key: const Key('time_wheel_minute'),
                           controller: _minuteController,
                           itemCount: 60,
@@ -118,7 +118,7 @@ class _TimeWheelDialogState extends State<_TimeWheelDialog> {
                         ),
                       ),
                       Expanded(
-                        child: _wheel<int>(
+                        child: _wheel(
                           key: const Key('time_wheel_period'),
                           controller: _periodController,
                           itemCount: 2,

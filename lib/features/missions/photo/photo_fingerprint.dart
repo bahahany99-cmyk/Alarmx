@@ -146,7 +146,8 @@ class FileFingerprintSource implements FingerprintSource {
       if (bytes.isEmpty) {
         return null;
       }
-      return computeDHash(bytes);
+      final int? hash = await computeDHash(bytes);
+      return hash;
     } catch (_) {
       return null;
     }
