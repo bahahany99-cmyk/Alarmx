@@ -23,6 +23,11 @@ enum PermissionSettingsTarget {
   /// Battery-optimization settings list.
   battery,
 
+  /// Full-screen-intent entry under Special App Access (API 34+): the
+  /// permission's app list, used when the per-app page bounces on OEM
+  /// skins. Falls back to app-details natively when unresolvable.
+  specialAppAccess,
+
   /// General app-details page (also the native fallback).
   appDetails,
 }

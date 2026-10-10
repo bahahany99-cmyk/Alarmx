@@ -280,6 +280,12 @@ class AppStrings {
   String get onboardingCompleteBody => text('onboardingCompleteBody');
   String get onboardingBounceNote => text('onboardingBounceNote');
   String get onboardingAppInfoAction => text('onboardingAppInfoAction');
+  String get onboardingFullScreenSkip => text('onboardingFullScreenSkip');
+  String get onboardingFullScreenSkipWhy => text('onboardingFullScreenSkipWhy');
+  String get onboardingSpecialAccessAction =>
+      text('onboardingSpecialAccessAction');
+  String get onboardingFullScreenBounceNote =>
+      text('onboardingFullScreenBounceNote');
   String get permissionCenterFix => text('permissionCenterFix');
   String get reliabilityReliable => text('reliabilityReliable');
   String get reliabilityMostly => text('reliabilityMostly');
@@ -533,6 +539,10 @@ class AppStrings {
     'onboardingCompleteBody': 'أصبح AlarmX جاهزًا. يمكنك مراجعة هذه الأذونات في أي وقت من مركز الأذونات.',
     'onboardingBounceNote': 'أُغلقت صفحة الإعدادات فورًا على هذا الجهاز. يمكنك فتح صفحة معلومات التطبيق بدلًا من ذلك.',
     'onboardingAppInfoAction': 'فتح معلومات التطبيق',
+    'onboardingFullScreenSkip': 'تخطَّ الآن',
+    'onboardingFullScreenSkipWhy': 'إذا كان هذا الإعداد غير موجود على هاتفك، يمكنك تخطيه: ستظل المنبهات ترن كإشعارات عالية الأولوية، ويمكنك السماح بمنبهات ملء الشاشة لاحقًا من مركز الصلاحيات.',
+    'onboardingSpecialAccessAction': 'فتح الوصول الخاص',
+    'onboardingFullScreenBounceNote': 'أُغلقت صفحة الإعدادات فورًا على هذا الجهاز. يمكنك فتح صفحة الوصول الخاص بدلًا من ذلك.',
     'permissionCenterFix': 'فتح الإعدادات',
     'reliabilityReliable': 'جاهز',
     'reliabilityMostly': 'شبه جاهز',
@@ -788,6 +798,10 @@ class AppStrings {
     'onboardingCompleteBody': 'AlarmX is ready. You can review these permissions anytime in Permission Center.',
     'onboardingBounceNote': 'That settings page closed immediately on this device. You can open the app info page instead.',
     'onboardingAppInfoAction': 'Open app info',
+    'onboardingFullScreenSkip': 'Skip for now',
+    'onboardingFullScreenSkipWhy': 'If this setting is missing on your phone, skip it: alarms will still ring as high-priority notifications, and you can allow full-screen alarms later in Permission Center.',
+    'onboardingSpecialAccessAction': 'Open special access',
+    'onboardingFullScreenBounceNote': 'That settings page closed immediately on this device. You can open the special access page instead.',
     'permissionCenterFix': 'Open Settings',
     'reliabilityReliable': 'Ready',
     'reliabilityMostly': 'Mostly ready',

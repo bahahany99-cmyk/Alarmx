@@ -284,6 +284,79 @@ void main() {
     await finishWidgetTest(tester, stack);
   });
 
+  testWidgets('full-screen skip completes without grant',
+      (WidgetTester tester) async {
+    final Map<String, Object?> snapshot = fakeGrantedSnapshot();
+    snapshot['fullScreenIntentAllowed'] = false;
+    final FakeOnboardingRepository onboarding = FakeOnboardingRepository();
+    bool finished = false;
+    await pumpOnboarding(
+      tester,
+      bridge: FakePermissionSystemBridge(snapshot: snapshot),
+      onboarding: onboarding,
+      onFinished: () {
+        finished = true;
+      },
+    );
+
+    await tapContinue(tester);
+    await tapContinue(tester);
+    expect(find.text(en.onboardingFullScreenTitle), findsOneWidget);
+    expect(find.text(en.onboardingFullScreenSkipWhy), findsOneWidget);
+    expect(
+      find.byKey(const Key('onboarding_skip_fullscreen')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('onboarding_skip_fullscreen')));
+    await pumpSettle(tester);
+
+    expect(find.text(en.onboardingCompleteTitle), findsOneWidget);
+    expect(onboarding.completed, isTrue);
+
+    await tester.tap(find.byKey(const Key('onboarding_done')));
+    await pumpSettle(tester);
+    expect(finished, isTrue);
+    await finishWidgetTest(tester, stack);
+  });
+
+  testWidgets('full-screen bounce offers the special access fallback',
+      (WidgetTester tester) async {
+    final Map<String, Object?> snapshot = fakeGrantedSnapshot();
+    snapshot['fullScreenIntentAllowed'] = false;
+    final FakePermissionSystemBridge bridge =
+        FakePermissionSystemBridge(snapshot: snapshot);
+    final DateTime now = DateTime(2026, 1, 1);
+    await pumpOnboarding(tester, bridge: bridge, clock: () => now);
+
+    await tapContinue(tester);
+    await tapContinue(tester);
+    expect(find.text(en.onboardingFullScreenTitle), findsOneWidget);
+    await tapPrimary(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[PermissionSettingsTarget.fullScreen],
+    );
+
+    // Instant return while still denied: the Special App Access fallback
+    // is offered instead of the app-info page.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpSettle(tester);
+    expect(find.text(en.onboardingFullScreenBounceNote), findsOneWidget);
+    expect(find.text(en.onboardingSpecialAccessAction), findsOneWidget);
+
+    await tester.tap(find.text(en.onboardingSpecialAccessAction));
+    await pumpSettle(tester);
+    expect(
+      bridge.opened,
+      <PermissionSettingsTarget>[
+        PermissionSettingsTarget.fullScreen,
+        PermissionSettingsTarget.specialAppAccess,
+      ],
+    );
+    await finishWidgetTest(tester, stack);
+  });
+
   testWidgets('shell shows onboarding on first launch, home after completion',
       (WidgetTester tester) async {
     final OnboardingRepository onboarding =

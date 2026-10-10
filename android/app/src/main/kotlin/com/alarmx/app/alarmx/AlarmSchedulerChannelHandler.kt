@@ -360,6 +360,18 @@ class AlarmSchedulerChannelHandler(
                     ),
                 )
             }
+            // Special App Access list for full-screen intent: the same
+            // action WITHOUT a package URI opens the permission's app
+            // list instead of the per-app page. Onboarding fallback for
+            // when the per-app page bounces (Realme/ColorOS hides the
+            // toggle from app info); the shared app-details fallback
+            // below still applies when this resolves to nothing.
+            "specialAppAccess" -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+                listOf(
+                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT),
+                )
+            }
             // The settings list needs no permission; the direct exemption
             // request action would need REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
             // in the manifest (Play-policy sensitive), so we do not use it.

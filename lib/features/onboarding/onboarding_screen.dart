@@ -393,6 +393,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Text(strings.onboardingSkip),
               ),
             ],
+            // Full-screen intent lives under Special App Access, a page
+            // some OEM skins (Realme/ColorOS) hide or bounce away from:
+            // the step always offers an explained skip so the flow can
+            // never trap the user. Skipping completes onboarding; alarms
+            // still ring as high-priority notifications.
+            if (step == OnboardingStep.fullScreen) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                strings.onboardingFullScreenSkipWhy,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+              TextButton(
+                key: const Key('onboarding_skip_fullscreen'),
+                onPressed: _busy ? null : _complete,
+                child: Text(strings.onboardingFullScreenSkip),
+              ),
+            ],
           ],
           if (_bounced && !granted) ...<Widget>[
             const SizedBox(height: 16),
@@ -403,16 +421,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Text(strings.onboardingBounceNote),
+                    Text(_bounceNote(strings, step)),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       key: const Key('onboarding_fallback'),
                       onPressed: _busy
                           ? null
-                          : () => _openTarget(
-                                PermissionSettingsTarget.appDetails,
-                              ),
-                      child: Text(strings.onboardingAppInfoAction),
+                          : () => _openTarget(_fallbackTarget(step)),
+                      child: Text(_fallbackLabel(strings, step)),
                     ),
                   ],
                 ),
@@ -497,6 +513,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       case OnboardingStep.battery:
         return strings.onboardingBatteryWhy;
     }
+  }
+
+  /// Bounce fallback per step. Full-screen intent is managed under
+  /// Special App Access, so a bounced visit retries there instead of the
+  /// app-info page (which lacks the toggle on some OEM skins).
+  static PermissionSettingsTarget _fallbackTarget(OnboardingStep step) {
+    if (step == OnboardingStep.fullScreen) {
+      return PermissionSettingsTarget.specialAppAccess;
+    }
+    return PermissionSettingsTarget.appDetails;
+  }
+
+  static String _fallbackLabel(AppStrings strings, OnboardingStep step) {
+    if (step == OnboardingStep.fullScreen) {
+      return strings.onboardingSpecialAccessAction;
+    }
+    return strings.onboardingAppInfoAction;
+  }
+
+  static String _bounceNote(AppStrings strings, OnboardingStep step) {
+    if (step == OnboardingStep.fullScreen) {
+      return strings.onboardingFullScreenBounceNote;
+    }
+    return strings.onboardingBounceNote;
   }
 
   static String _primaryLabel(AppStrings strings, OnboardingStep step) {
