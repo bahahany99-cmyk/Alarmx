@@ -291,6 +291,10 @@ void main() {
     // The shell renders the stored language (Arabic by default); switch to
     // English like pumpAlarmxApp does before asserting English strings.
     await stack.setLanguage('en');
+    // Scripted platform: this test owns shell routing, not the native
+    // channel (an unmocked MethodChannel never settles under pumpSettle).
+    final FakePermissionSystemBridge bridge = FakePermissionSystemBridge();
+    final FakeNotificationGate gate = FakeNotificationGate();
     Future<void> pumpShell() {
       return tester.pumpWidget(
         AlarmxApp(
@@ -299,6 +303,8 @@ void main() {
           settings: stack.settings,
           missionService: stack.missions,
           history: stack.history,
+          permissionBridge: bridge,
+          notificationGate: gate,
           onboarding: onboarding,
         ),
       );
