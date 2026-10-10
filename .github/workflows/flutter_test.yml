@@ -58,6 +58,31 @@ jobs:
                   return []
               return lines[-count:]
 
+          def read_failures(path, limit=80):
+              """Failure lines with a little context: the tail rarely shows
+              which test failed, so pull the [E]/exception/assertion lines
+              out of the full log."""
+              import re
+              try:
+                  lines = open(path, errors='replace').read().splitlines()
+              except OSError:
+                  return []
+              marker = re.compile(
+                  r'\[E\]|EXCEPTION CAUGHT|Test failed|Expected:|Actual:|'
+                  r'Which:|The test description was:|'
+                  r'[Ss]ome tests failed|\+[0-9]+ -[0-9]+.*: .*: .+')
+              out, seen = [], set()
+              for i, line in enumerate(lines):
+                  if not marker.search(line):
+                      continue
+                  for extra in lines[i:i + 3]:
+                      if extra not in seen:
+                          seen.add(extra)
+                          out.append(extra)
+                          if len(out) >= limit:
+                              return out
+              return out
+
           chunks = []
           for name, path in (('analyze', '/tmp/analyze.log'),
                              ('test', '/tmp/test.log')):
@@ -71,6 +96,17 @@ jobs:
                   chunk.append(line); size += len(line) + 1
               if chunk:
                   chunks.append((name, chunk))
+
+          failures = read_failures('/tmp/test.log')
+          if failures:
+              chunk, size = [], 0
+              for line in failures:
+                  if size + len(line) > 2500:
+                      chunks.append(('test-failures', chunk))
+                      chunk, size = [], 0
+                  chunk.append(line); size += len(line) + 1
+              if chunk:
+                  chunks.append(('test-failures', chunk))
 
           if not chunks:
               print('::error title=no-logs::no analyze/test log was produced')
